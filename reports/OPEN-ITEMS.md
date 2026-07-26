@@ -133,3 +133,26 @@ already written for the exit advisor (`_entry_signals_for`). The prompt would th
 
 **Deliberately out of scope for the 2026-07-26 session: it modifies the ENTRY path.** The per-signal
 n is also thin (largest cell n=6), so the advisor would be handed identity it cannot yet calibrate.
+
+## 8. ROTATE THE ANTHROPIC API KEY (2026-07-26)
+
+A live `ANTHROPIC_API_KEY` sat in plaintext in two **world-readable** cron logs for twenty days:
+`/var/log/titan_counter_short_filter_review.log` (07-08, 07-15, 07-22) and
+`/var/log/mercury_sol_30trade_reminder.log` (07-06, 07-20). Five occurrences, 644 perms.
+Cause: `.env` had `ANTHROPIC_API_KEY= <value>` — leading space, no quotes — and
+`set -a; . "$ENV_FILE"` made bash execute the value as a command and echo it to stderr.
+
+Purged, permissions locked to 600, `.env` quoted, and the sourcing replaced on both bots with a
+non-executing parser. **The key itself is unchanged and must be rotated — that is the Boss's call.**
+Both bots share it (`project_shared_anthropic_key`), so rotation touches Titan and Mercury-SOL.
+
+Lower severity, same class: two Telegram bot tokens appeared in `syslog.2.gz`/`syslog.4.gz`
+(13 lines, `640 syslog:adm`) because the mercury-sol optimizer listener prints a `requests`
+exception containing the full bot URL. Archives redacted; the listener still does it.
+
+## 9. Sensor cleanup applied 2026-07-26
+RETIRED -> `/root/titan-bot/retired_sensors/`: counter_short_filter_review, toln_short_cohort_watch,
+prior_move_logger. REDEFINED: chop_short_flat_gap (gap1h='Flat' under regime='TREND'),
+regime_flat_high_adx (window 3d -> 21d, now N=5/12 instead of a permanent 0).
+RECLASSIFIED as data sources, still running: ob-density collector, smart-exit sampler — the exit
+advisor reads both. Only the dryrun VERDICT fields are deprecated; the sampler code was not touched.
