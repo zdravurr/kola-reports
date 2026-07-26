@@ -156,3 +156,19 @@ prior_move_logger. REDEFINED: chop_short_flat_gap (gap1h='Flat' under regime='TR
 regime_flat_high_adx (window 3d -> 21d, now N=5/12 instead of a permanent 0).
 RECLASSIFIED as data sources, still running: ob-density collector, smart-exit sampler — the exit
 advisor reads both. Only the dryrun VERDICT fields are deprecated; the sampler code was not touched.
+
+## 10. WEBHOOK PASSPHRASE in nginx access logs (found 2026-07-26, missed by the first scan)
+
+nginx logs the full request line, so the Titan `?key=` and the SOL `?secret=` appear in plaintext on
+every webhook request: ~1,062 lines in the live+rotated logs and ~3,518 in the compressed archives,
+all `640 www-data:adm` (group adm = syslog only, so NOT world-readable).
+
+The first secret scan missed this because it searched for the env-var form `WEBHOOK_PASSPHRASE=`,
+not the URL form `?key=<value>`. Scanning error, not a new event — it has been happening since nginx
+was placed in front of the bot. Note the bot itself redacts this correctly in its own log
+(`KeyStrippingHandler` in main.py); nginx logs the raw line before that.
+
+Values redacted in place across current, rotated and gz logs (redacted, not deleted, so the
+request-volume evidence survives). TWO THINGS REMAIN, both the Boss's call:
+  * rotate the passphrase — means editing every TradingView alert URL by hand on both bots;
+  * stop nginx logging the query string (`log_format` change) — shared infra, affects both bots.
