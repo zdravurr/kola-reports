@@ -172,3 +172,21 @@ Values redacted in place across current, rotated and gz logs (redacted, not dele
 request-volume evidence survives). TWO THINGS REMAIN, both the Boss's call:
   * rotate the passphrase — means editing every TradingView alert URL by hand on both bots;
   * stop nginx logging the query string (`log_format` change) — shared infra, affects both bots.
+
+## 11. Volume-spike entry ceiling — NOT BUILT, expiry date set (2026-07-26)
+
+Two angles pointed at high 5m volume marking losing entries. On the clean, correctly-measured sample
+both collapse to the SAME seven positions: SHORT n=4 (2W/2L, perfect separation but p=0.333), LONG
+n=3 and CONTRADICTING. The originally quoted p=0.048 at n=7 included vpos 66, 68, 74 — all
+contaminated by the wall-trail window or a recheck TIGHTEN. The SL-vs-trail comparison (2.54 vs 0.95)
+was computed almost entirely on the pre-07-04 corrupted forming-candle metric; only 3 of 25 SL deaths
+and 2 of 14 trail exits have a usable measurement.
+
+NOT BUILT. No diff, no A/B arm, no threshold.
+
+REVIEW DATE — so this cannot go stale the way the counter-short statistic did: re-cut at ~10 clean
+corrected SHORT closes, and IN ANY CASE no later than **2026-09-30**. If the cohort has not reached n
+by then, the finding EXPIRES rather than waiting indefinitely.
+
+Note for the volfloor sensor: its threshold (6 per side) counts rows that decontamination removes.
+It should count CLEAN rows. Not acted on.
