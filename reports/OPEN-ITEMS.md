@@ -115,3 +115,21 @@ Written before the first verdict exists, precisely so it cannot be adjusted to f
 Cross-check when the window closes: the 27-moment backtest (2026-07-26 19:37 report) gave +67.30 USDT
 across 6 positions, 3 improved / 1 worsened / 2 unchanged — with the whole delta carried by two
 trades. That was a plausibility check, not evidence, and it does not count toward this criterion.
+
+## 7. ENTRY advisor is blind to the 1H signal identity
+
+`AI_ADVISOR_HIDE_1H = True` (config.py:337). The entry prompt names two of the three tiers —
+`15m: HyperWave Signal Up`, `5m trigger: Bullish OB Created` — but never the 1H alert that set the
+trend. It sees only the OHLCV-derived state, `1h: BULL, ADX 16.9`.
+
+Consequence: it cannot distinguish signals with identical matrix weight and opposite records —
+`Bearish Confirmation+` (weight 1.0, n=4, net **+1063**) and `Trend Catcher Up` (weight 1.0, n=6,
+net **-68**) both reach it as "1h BULL".
+
+Candidate change: one line above the existing 15m line —
+`1H trend set by: <signal> (weight w, set Nh ago)` — sourced from the same `1h_trend_set` lookup
+already written for the exit advisor (`_entry_signals_for`). The prompt would then read
+*"1H Trend Catcher Up + 15m HyperWave Signal Up + 5m Bullish I-BOS"* instead of *"aligned bullish"*.
+
+**Deliberately out of scope for the 2026-07-26 session: it modifies the ENTRY path.** The per-signal
+n is also thin (largest cell n=6), so the advisor would be handed identity it cannot yet calibrate.
