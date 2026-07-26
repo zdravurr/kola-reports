@@ -96,3 +96,22 @@ wired in, how often it fires, or whether its verdicts are any good.**
 * `f7df202` — LONG partial realisation, 1/3 @ +1R, LONG-only.
 * Earlier: wall-trail disabled (`5f1b073`), phantom-wall recheck trigger zeroed (`c845941`),
   FLAT-regime score floor enforced (`db71454`).
+
+---
+
+## 6. ACTIVATION CRITERION — exit advisor (recorded 2026-07-26, BEFORE any data exists)
+
+**The exit advisor goes live only if, over the first ~10 closed positions, its FIRST "close"
+verdict beats the actual exit BOTH in total USDT AND in the number of positions improved.
+Otherwise it stays in record mode.**
+
+**No partial credit. No re-cutting the sample.** The window is the first ~10 closed positions after
+the advisor starts recording — not the best ten, not ten chosen afterwards. "Beats" means both
+conditions together: total USDT higher, and more positions improved than worsened. One condition
+without the other is a failure.
+
+Written before the first verdict exists, precisely so it cannot be adjusted to fit the result.
+
+Cross-check when the window closes: the 27-moment backtest (2026-07-26 19:37 report) gave +67.30 USDT
+across 6 positions, 3 improved / 1 worsened / 2 unchanged — with the whole delta carried by two
+trades. That was a plausibility check, not evidence, and it does not count toward this criterion.
