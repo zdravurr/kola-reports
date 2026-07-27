@@ -237,8 +237,27 @@ Simulated on 21,032 real candles: the smart-TP rule fires on 18 positions for **
 the clean 14**, improving only 5 of 14, and every subsetting keeps the sign. It destroys the short
 side (vpos 58 -435, vpos 50 -403 — large short winners closed early on an EQL while the move ran).
 
-🔴 TRAP FOR A FUTURE SESSION: `EQH_EQL_SMART_TP_ENABLED = True` in config READS AS ARMED AND IS NOT —
-it is checked inside a function that is never entered. Anyone who fixes the routing (name-based
-recognition would be trivial; classify() already maps 'Equal Highs' -> LIQUIDITY/SHORT/eqh/0.9)
-would arm a loss-making rule by accident. The unreachable branch has been protecting the book.
-The alerts themselves are fine and already contribute LIQUIDITY matrix weight — that is their role.
+🔴 TRAP FOR A FUTURE SESSION — DO NOT "FIX" THE ROUTING.
+`EQH_EQL_SMART_TP_ENABLED = True` in config READS AS ARMED AND IS NOT. The flag is only ever
+read inside `_handle_liquidity_sweep()` (main.py:2746), and that function is never entered.
+
+MECHANISM (verified 2026-07-27, not inferred): the dispatch gate at main.py:2977 requires
+`action_field == 'context_update' AND raw_signal_type in ('EQH','EQL')`, where `raw_signal_type`
+comes from the PAYLOAD's own `signal_type` field. The live alerts never carry that value, so the
+condition is False on every fire and the sweeps fall through to the generic context path instead.
+PROOF: all 304 EQH/EQL rows in `trades` land with `signal_type='5m_liquidity_ctx'`, and
+`signal_type_ctx` — a column written ONLY at main.py:2766, inside the handler — is NULL on
+304 of 304. The handler has not run once since the alerts went live in May.
+
+Restoring reachability is a one-line change (name-based recognition; `classify()` already maps
+'Equal Highs' -> LIQUIDITY/SHORT/eqh/0.9), which is exactly why this is dangerous: anyone who
+"repairs" it without reading the 00:38 report would SILENTLY ARM a rule that loses -971 on the
+clean sample and destroys the short side by closing winning shorts early on an EQL. The
+unreachable branch has been protecting the book — by luck, not by design.
+
+STANDING DECISION: leave BOTH the flag and the routing EXACTLY as they are. Do not flip the flag
+to False (it changes nothing and would make a future reader think the rule was evaluated and
+merely switched off), and do not repair the dispatch. The alerts themselves are correct and
+already do useful work as LIQUIDITY-category matrix weight (0.9) — one input among many at
+entry. That is their role, and it is the only role the data supports.
+Full evidence: reports/2026-07-27-0038-eqh-eql-sweeps-tested-and-killed.md
