@@ -190,3 +190,24 @@ by then, the finding EXPIRES rather than waiting indefinitely.
 
 Note for the volfloor sensor: its threshold (6 per side) counts rows that decontamination removes.
 It should count CLEAN rows. Not acted on.
+
+## 12. Remaining small loose ends on Titan (2026-07-27, none on the trade path)
+
+1. **mfe_tracking / breakeven_jobs / liquidity_sweep_state: 0 rows each, but each HAS a writer**
+   (mfe_tracker.py, breakeven_worker.py, liquidity_sweep.py). A table with a writer and no rows means
+   the writer never runs or its path is dead — the same shape as the 15m missing write. Worth tracing.
+   Not urgent: nothing reads them either.
+2. 13 of 28 status strings in main.py have never appeared in the DB. Five are the exit-advisor path
+   (explained). The other eight are branches that have not executed in 77 days — untested code.
+3. 12 config constants carry no comment (LIQUIDITY_SWEEP_WEIGHT_BONUS, LOSS_STREAK_COOLDOWN_HOURS,
+   MACRO_VOLATILITY_PENALTY, CONFIRMED_REVERSAL_IDS, OBSERVE_REVERSAL_IDS,
+   HTF_NEUTRAL_REQUIRE_15M_DRYRUN and 6 more). AI_ADVISOR_HIDE_1H had its rationale written down,
+   which is the only reason the 2026-07-27 decision about it was answerable. These twelve do not.
+4. 34 .bak* files, 111 MB working directory. Housekeeping.
+5. mercury_sol_30trade_reminder.sh logs "db-read-failed (got 'ERR')" since 2026-07-13 — SOL scope.
+
+## 13. Entry advisor now sees 1H signal IDENTITY (f0a8d30) — statistic deliberately withheld
+One line added: name + matrix weight + age. NO win rate, NO PnL, NO performance. Largest per-signal
+cell is n=6. Attaching a statistic is a SEPARATE decision requiring its own validation and its own n
+— do not add one without it. AI_ADVISOR_HIDE_1H stays True; its documented rationale (avoid
+re-weighing a tier the HTF cascade already gates) concerns DIRECTION, not identity.
