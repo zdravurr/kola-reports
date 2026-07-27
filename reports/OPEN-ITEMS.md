@@ -211,3 +211,20 @@ One line added: name + matrix weight + age. NO win rate, NO PnL, NO performance.
 cell is n=6. Attaching a statistic is a SEPARATE decision requiring its own validation and its own n
 — do not add one without it. AI_ADVISOR_HIDE_1H stays True; its documented rationale (avoid
 re-weighing a tier the HTF cascade already gates) concerns DIRECTION, not identity.
+
+## 14. The three zero-row tables — traced 2026-07-27, NONE is the 15m class
+* `breakeven_jobs` — (b) LIVE-PATH ONLY. Enqueued from _execute_entry with a real exchange
+  sl_order_id; paper uses virtual_trader's own breakeven. Zero rows is CORRECT.
+  **ADD TO THE LIVE-PARITY LIST** alongside the LONG partial and the recheck bound.
+* `liquidity_sweep_state` — (d) NEVER TRIGGERED. Handler needs action_field=='context_update' AND
+  raw_signal_type in ('EQH','EQL'); the alerts arrive as tf=5m task=price_action with NO signal_type
+  field, and the router forces 5m to execute_trade. ~300 real Equal Highs/Lows discarded as context.
+  EQH_EQL_SMART_TP_ENABLED=True is irrelevant — checked inside a function never entered.
+  Reviving it is an ALERT-CONFIG change (explicit signal_type + context_update task), not code.
+* `mfe_tracking` — (d) NEVER TRIGGERED, downstream of the same root: its ONLY call site is inside
+  the unreachable sweep handler.
+
+MFE SOURCE — settled: water_mark measures MFE DURING the position (entry->exit) and is the correct
+source; mfe_tracker measured POST-CLOSE MFE (exit->exit+60min), a different question already answered
+better by the post-exit observatory (5 horizons to 24h vs one 60-min window). Today's excursion
+conclusions are unaffected. mfe_tracker is REDUNDANT, not missing.
