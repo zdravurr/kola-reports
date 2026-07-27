@@ -1,263 +1,258 @@
 # TITAN — OPEN ITEMS
 
-Diagnosed but **not applied**. This file exists so nothing is lost between sessions.
-Every entry states what is known, what is NOT known, and what would close it.
+**Read this before touching Titan.** Written to be actionable by a session with **no memory** of
+2026-07-26/27. Every entry states what is known, what is **not** known, and what would close it.
 
-_Last updated: 2026-07-26 (session: recheck bound · counter-short caution retired · LONG partial shipped)_
+Titan is a **BTC swing paper-trading bot**. `LIVE_TRADING_ENABLED = False`. All P&L below is paper
+P&L from the `virtual_positions` table.
 
----
-
-## 1. 🔴 LIVE-PATH PARITY GAP — LONG partial exists in paper only
-
-`virtual_trader.py` now takes a 1/3 partial at +1R on LONGs (`f7df202`).
-**`breakeven_worker.py` — the live path — has no equivalent.**
-
-* Harmless today: `LIVE_TRADING_ENABLED = False`, so every position is paper.
-* **If live is ever enabled, longs would behave differently in live vs paper** — the paper book
-  would bank a tranche at +1R and the live book would not, and the two would diverge silently.
-* **MUST be closed before `LIVE_TRADING_ENABLED` is set True.** This is a blocking item, not a
-  nice-to-have.
-* Same class of gap to check at that time: the R1 recheck bound (`93c20c3`) and the FLAT score
-  floor also live in the paper/entry path — verify parity for each before going live.
-
-## 2. LONG partial parameters are PLACEHOLDERS, not findings
-
-`LONG_PARTIAL_LEVEL_R = 1.0`, `LONG_PARTIAL_FRACTION = 1/3`.
-
-* Chosen as the conservative corner of the tested grid (the only partial variant that cut zero
-  winners in simulation), **not** because the data selected them.
-* n = 10 clean longs, of which **6 ever exceeded 0.5R and 5 were winners**. One trade decides the
-  ranking: 0.75R beats 1.0R entirely because it catches vpos 41 (peaked 0.91R, ended −1.05R).
-* **Retune when ~30 clean long closes with MFE above 0.5R exist.** Current: 6.
-* Kill switch: `LONG_PARTIAL_ENABLED = False` restores the previous contract exactly, no code edit.
-
-## 3. Variant C (narrower LONG trail) is UNEVALUATED — not rejected
-
-A narrower trail exits at the first retracement of its own width from the **running** peak, so it
-can exit before the global peak is reached.
-
-* Simulating it from endpoints (MFE, exit) assumes the global peak came first — an **optimistic
-  upper bound**, not an estimate. Under that bound it looked good: LONG +164.76 at 0.5R width.
-* Real excursion paths exist only for `position_excursion_samples` (vpos 61+), and among clean,
-  **armed** positions that is **one long (vp79) and one short (vp81)**. Path and bound agreed on
-  both — on n=1 per side, and only because those two paths rose near-monotonically.
-* **Revisit when path coverage extends.** The excursion logger now runs on every position, so this
-  resolves itself with time and needs no new work.
-
-## 4. Entry-advisor order-book calibration — one confirmed miscalibration, scale unmeasured
-
-`trades.id = 18631` (2026-07-26 10:55, SHORT, `ai_skipped`), advisor reason verbatim:
-
-> *"1h BULL + 1h ADX 13.5 (weak) opposes SHORT. **Massive ask wall ×5.9 above entry blocks upside.**
-> MTF alignment 0/4. Statistical headwind -0.49%/12h. Skip."*
-
-An ask wall **above** entry is overhead supply — it blocks upside, which is a **tailwind for a
-SHORT**, not a reason to skip one. The advisor read a supporting feature as an opposing one.
-
-* **What is known:** one instance, verbatim, in the stored payload/reason pair.
-* **What is NOT known:** whether this is systematic, how often it flips a verdict, or whether the
-  same confusion runs the other way on LONGs. No frequency, no direction, no cost estimate.
-* **To close:** classify wall-side references across all stored `ai_reason` texts by trade side and
-  wall side, and measure how often the sign is wrong. `ai_user_prompt` + `ai_reason` are both
-  persisted for 2,685 decisions, so this is a read-only study needing no new instrumentation.
-
-## 5. Exit advisor — existence and capability not yet established
-
-`claude_advisor.consult_for_close()` exists in the code. **Nothing is known about whether it is
-wired in, how often it fires, or whether its verdicts are any good.**
-
-* The book shows 9 `external` closes across 49 positions, but they have not been traced to a
-  caller, and no equivalent of `ai_user_prompt` / `ai_reason` has been checked for the close path.
-* **To close:** trace the call sites, count invocations, and — if it fires — apply the same
-  evidence discipline used on the entry-side caution (does the payload reach it, does the reasoning
-  reference it, does it change a decision).
+_Last updated: **2026-07-27 01:00 UTC** — full rewrite at session close. HEAD `f0a8d30`._
 
 ---
 
-## Watch-list items still accumulating (not defects — just waiting for n)
+## 0. HOW TO READ THE DATA WITHOUT FOOLING YOURSELF
 
-| item | current n | needed | note |
-|---|---|---|---|
-| Prior-move bucket (R2) | SHORT mid/late = **0** | SHORT observations in mid/late | logger running; months away |
-| Chop-short gap=Flat | 1 of 5 new | 5 | FLAT gate now starves this cohort — may never fill |
-| Smart-exit chop giveback | **0 armed** chop samples | ~5 chop closes that arm | same starvation risk |
-| Order-book percentile veto | 9 entries with book data | ~15–20 | baseline is healthy (19k+ snapshots) |
-| TOLN short cohort | 1–2 | 6 | |
-| regime-FLAT high-ADX | 0 | 12 | |
-| vol_ratio_5m ceiling (R4) | 7 SHORT (2 winners) | more winners | **build with the deterministic `row_id % 2` A/B arm from the start** |
+Four filters. Most of the wrong conclusions killed in §4 came from skipping one of them.
+**Apply all four before quoting any statistic about entries or exits.**
 
----
+| Filter | Why | Predicate |
+|---|---|---|
+| Forming-candle fix | `srv_vol_ratio_5m` before this read the **forming** candle and is not comparable | `t.timestamp >= '2026-07-04 11:58'` (commit `55d9c7f`) |
+| Wall-trail window | Outcome decided by a **moved stop**, not by the entry | `NOT (opened_at < '2026-07-13T01:55' AND closed_at > '2026-07-02T23:28')` |
+| Recheck TIGHTEN | Same — stop was moved after entry | `COALESCE(recheck_status,'') <> 'tightened'` |
+| Excursion truth | `max_adverse_price` **stops updating at the close**, so it understates what price did | use real OHLCV candles, not stored extrema |
 
-## Closed this session (for context, not action)
+⚠️ The wall-trail filter must test **lifetime overlap**, not entry time. Using entry time alone
+silently drops vpos 62. This exact bug produced a wrong answer once already.
 
-* `93c20c3` — post-entry recheck TIGHTEN bounded at the original stop distance.
-* `b878535` — counter-trend EMA-1h soft caution retired (founding statistic did not reproduce;
-  cohort sign inverted on post-06-27 data).
-* `f7df202` — LONG partial realisation, 1/3 @ +1R, LONG-only.
-* Earlier: wall-trail disabled (`5f1b073`), phantom-wall recheck trigger zeroed (`c845941`),
-  FLAT-regime score floor enforced (`db71454`).
+**Sign convention:** skip-drift `_compute_drift_pct` is **positive = the skipped signal would have
+won**. Reading it backwards inverts every veto conclusion. This caused a real inverted finding.
 
 ---
 
-## 6. ACTIVATION CRITERION — exit advisor (recorded 2026-07-26, BEFORE any data exists)
+## 1. 🔴 LIVE-PATH PARITY GAP — BLOCKING before `LIVE_TRADING_ENABLED = True`
 
-**The exit advisor goes live only if, over the first ~10 closed positions, its FIRST "close"
-verdict beats the actual exit BOTH in total USDT AND in the number of positions improved.
-Otherwise it stays in record mode.**
+**Three mechanisms exist in the paper path only:**
 
-**No partial credit. No re-cutting the sample.** The window is the first ~10 closed positions after
-the advisor starts recording — not the best ten, not ten chosen afterwards. "Beats" means both
-conditions together: total USDT higher, and more positions improved than worsened. One condition
-without the other is a failure.
+| Mechanism | Commit | Lives in |
+|---|---|---|
+| LONG partial realisation (1/3 at +1R) | `f7df202` | `virtual_trader.py` |
+| Recheck TIGHTEN original-SL floor | `93c20c3` | `virtual_trader.py` |
+| `breakeven_jobs` | (pre-existing) | `virtual_trader.py` |
 
-Written before the first verdict exists, precisely so it cannot be adjusted to fit the result.
+Enabling live trading today would run a **materially different strategy** from the one being
+measured — no partial, no stop floor, no breakeven jobs.
 
-Cross-check when the window closes: the 27-moment backtest (2026-07-26 19:37 report) gave +67.30 USDT
-across 6 positions, 3 improved / 1 worsened / 2 unchanged — with the whole delta carried by two
-trades. That was a plausibility check, not evidence, and it does not count toward this criterion.
+**OPERATOR'S DECISION (2026-07-26), do not deviate:** rewrite the engine as **ONE code path with
+two adapters** — orders either go to the exchange or are simulated — **NOT** piecemeal porting of
+each mechanism into a second live path. Piecemeal porting is how the divergence happened.
+**Do this well before live is enabled**, not as part of enabling it.
 
-## 7. ENTRY advisor is blind to the 1H signal identity
+---
 
-`AI_ADVISOR_HIDE_1H = True` (config.py:337). The entry prompt names two of the three tiers —
-`15m: HyperWave Signal Up`, `5m trigger: Bullish OB Created` — but never the 1H alert that set the
-trend. It sees only the OHLCV-derived state, `1h: BULL, ADX 16.9`.
+## 2. STILL OPEN — carry forward
 
-Consequence: it cannot distinguish signals with identical matrix weight and opposite records —
-`Bearish Confirmation+` (weight 1.0, n=4, net **+1063**) and `Trend Catcher Up` (weight 1.0, n=6,
-net **-68**) both reach it as "1h BULL".
+### 2.1 LONG partial parameters are placeholders
+`LONG_PARTIAL_LEVEL_R = 1.0`, `LONG_PARTIAL_FRACTION = 1/3` were chosen as **round numbers that
+survived simulation**, not as optima. Retune at **~30 clean longs reaching above 0.5R**.
+**Current: 7 clean** (was 6; vpos 82 added tonight).
 
-Candidate change: one line above the existing 15m line —
-`1H trend set by: <signal> (weight w, set Nh ago)` — sourced from the same `1h_trend_set` lookup
-already written for the exit advisor (`_entry_signals_for`). The prompt would then read
-*"1H Trend Catcher Up + 15m HyperWave Signal Up + 5m Bullish I-BOS"* instead of *"aligned bullish"*.
+**First live firing — 2026-07-27 00:07, vpos 82:** partial took **+18.91 USDT** at 1R, remainder
+rode the unchanged contract to a trail exit, **total +53.79**. One datapoint. It proves the
+mechanism executes and folds into `net_pnl`; it proves **nothing** about the parameters.
 
-**Deliberately out of scope for the 2026-07-26 session: it modifies the ENTRY path.** The per-signal
-n is also thin (largest cell n=6), so the advisor would be handed identity it cannot yet calibrate.
+### 2.2 Variant C (narrower LONG trail) — UNEVALUATED, not rejected
+Was not tested because the excursion data needed to judge it (full price path between entry and
+exit, per position) was not assembled. **It is not a rejected idea — it is an unasked question.**
+Closing it needs excursion-path coverage on real candles, the same method §4.10 settled on.
 
-## 8. ROTATE THE ANTHROPIC API KEY (2026-07-26)
+### 2.3 🔴 Entry advisor gets an uninformative wall label — LIVE ASYMMETRY
+The entry advisor receives the **hard-coded word "Massive"** for every wall above `4.0x`, with
+**no percentile scale**. **100% of observed book states contain such a wall**, so the label carries
+**zero information** — it is a constant being read as an alarm.
 
-A live `ANTHROPIC_API_KEY` sat in plaintext in two **world-readable** cron logs for twenty days:
-`/var/log/titan_counter_short_filter_review.log` (07-08, 07-15, 07-22) and
-`/var/log/mercury_sol_30trade_reminder.log` (07-06, 07-20). Five occurrences, 644 perms.
-Cause: `.env` had `ANTHROPIC_API_KEY= <value>` — leading space, no quotes — and
-`set -a; . "$ENV_FILE"` made bash execute the value as a command and echo it to stderr.
+The **exit** advisor was given the percentile scale in `ef7fa10` (`_exit_pct()` against the
+`orderbook_density` baseline). The **entry** advisor was not. **The two advisors now describe the
+same order book in two different languages** — this asymmetry is the gap, and it is live.
 
-Purged, permissions locked to 600, `.env` quoted, and the sourcing replaced on both bots with a
-non-executing parser. **The key itself is unchanged and must be rotated — that is the Boss's call.**
-Both bots share it (`project_shared_anthropic_key`), so rotation touches Titan and Mercury-SOL.
+Closing it: feed the entry advisor the same `orderbook_density` percentile the exit side uses.
+The baseline table is already populated by the always-on collector (§3).
 
-Lower severity, same class: two Telegram bot tokens appeared in `syslog.2.gz`/`syslog.4.gz`
-(13 lines, `640 syslog:adm`) because the mercury-sol optimizer listener prints a `requests`
-exception containing the full bot URL. Archives redacted; the listener still does it.
+### 2.4 Exit-advisor activation criterion — RECORDED BEFORE ANY DATA EXISTED
+Written down **deliberately in advance** so the bar cannot be moved after seeing results.
 
-## 9. Sensor cleanup applied 2026-07-26
-RETIRED -> `/root/titan-bot/retired_sensors/`: counter_short_filter_review, toln_short_cohort_watch,
-prior_move_logger. REDEFINED: chop_short_flat_gap (gap1h='Flat' under regime='TREND'),
-regime_flat_high_adx (window 3d -> 21d, now N=5/12 instead of a permanent 0).
-RECLASSIFIED as data sources, still running: ob-density collector, smart-exit sampler — the exit
-advisor reads both. Only the dryrun VERDICT fields are deprecated; the sampler code was not touched.
+> It goes live only if, over the first **~10 closed positions**, its **FIRST** `"close"` verdict
+> beats the actual exit **both in total USDT and in positions improved**.
+> **No partial credit. No re-cutting the sample. First verdict only** — not its best verdict.
 
-## 10. WEBHOOK PASSPHRASE in nginx access logs (found 2026-07-26, missed by the first scan)
+**Progress: 1 of ~10 closed** (vpos 82, closed 2026-07-27 00:07). 3 consults recorded so far
+(rows 18773, 18789, 18796) — all `hold`, so no verdict has yet been tested against an exit.
+Currently `EXIT_ADVISOR_DRYRUN = True`: it can never close a position.
 
-nginx logs the full request line, so the Titan `?key=` and the SOL `?secret=` appear in plaintext on
-every webhook request: ~1,062 lines in the live+rotated logs and ~3,518 in the compressed archives,
-all `640 www-data:adm` (group adm = syslog only, so NOT world-readable).
+### 2.5 Volume ceiling — NOT BUILT, and has an EXPIRY
+Clean n is **4 SHORT / 4 LONG**. SHORT **p = 0.333**; LONG **contradicts** the thesis (p = 1.000).
 
-The first secret scan missed this because it searched for the env-var form `WEBHOOK_PASSPHRASE=`,
-not the URL form `?key=<value>`. Scanning error, not a new event — it has been happening since nginx
-was placed in front of the bot. Note the bot itself redacts this correctly in its own log
-(`KeyStrippingHandler` in main.py); nginx logs the raw line before that.
+The earlier, exciting **p = 0.048 came from three contaminated rows** (vpos 66, 68, 74). The
+sensor that reported it has since been fixed to count clean rows only.
 
-Values redacted in place across current, rotated and gz logs (redacted, not deleted, so the
-request-volume evidence survives). TWO THINGS REMAIN, both the Boss's call:
-  * rotate the passphrase — means editing every TradingView alert URL by hand on both bots;
-  * stop nginx logging the query string (`log_format` change) — shared infra, affects both bots.
+Re-cut at **~10 clean corrected SHORT closes**. **EXPIRES 2026-09-30** if n is not reached —
+**delete it then.** Rationale: the counter-short caution shipped on a statistic that quietly
+stopped being true and nobody re-checked for months (§4.5). An expiry date is how that is
+prevented, so **do not extend it silently**.
 
-## 11. Volume-spike entry ceiling — NOT BUILT, expiry date set (2026-07-26)
+### 2.6 🔴 EQH/EQL SMART TP — READS AS ARMED, IS UNREACHABLE. DO NOT "FIX" IT.
+`EQH_EQL_SMART_TP_ENABLED = True` in config **READS AS ARMED AND IS NOT.** The flag is only ever
+read inside `_handle_liquidity_sweep()` (`main.py:2746`), and that function is **never entered**.
 
-Two angles pointed at high 5m volume marking losing entries. On the clean, correctly-measured sample
-both collapse to the SAME seven positions: SHORT n=4 (2W/2L, perfect separation but p=0.333), LONG
-n=3 and CONTRADICTING. The originally quoted p=0.048 at n=7 included vpos 66, 68, 74 — all
-contaminated by the wall-trail window or a recheck TIGHTEN. The SL-vs-trail comparison (2.54 vs 0.95)
-was computed almost entirely on the pre-07-04 corrupted forming-candle metric; only 3 of 25 SL deaths
-and 2 of 14 trail exits have a usable measurement.
-
-NOT BUILT. No diff, no A/B arm, no threshold.
-
-REVIEW DATE — so this cannot go stale the way the counter-short statistic did: re-cut at ~10 clean
-corrected SHORT closes, and IN ANY CASE no later than **2026-09-30**. If the cohort has not reached n
-by then, the finding EXPIRES rather than waiting indefinitely.
-
-Note for the volfloor sensor: its threshold (6 per side) counts rows that decontamination removes.
-It should count CLEAN rows. Not acted on.
-
-## 12. Remaining small loose ends on Titan (2026-07-27, none on the trade path)
-
-1. **mfe_tracking / breakeven_jobs / liquidity_sweep_state: 0 rows each, but each HAS a writer**
-   (mfe_tracker.py, breakeven_worker.py, liquidity_sweep.py). A table with a writer and no rows means
-   the writer never runs or its path is dead — the same shape as the 15m missing write. Worth tracing.
-   Not urgent: nothing reads them either.
-2. 13 of 28 status strings in main.py have never appeared in the DB. Five are the exit-advisor path
-   (explained). The other eight are branches that have not executed in 77 days — untested code.
-3. 12 config constants carry no comment (LIQUIDITY_SWEEP_WEIGHT_BONUS, LOSS_STREAK_COOLDOWN_HOURS,
-   MACRO_VOLATILITY_PENALTY, CONFIRMED_REVERSAL_IDS, OBSERVE_REVERSAL_IDS,
-   HTF_NEUTRAL_REQUIRE_15M_DRYRUN and 6 more). AI_ADVISOR_HIDE_1H had its rationale written down,
-   which is the only reason the 2026-07-27 decision about it was answerable. These twelve do not.
-4. 34 .bak* files, 111 MB working directory. Housekeeping.
-5. mercury_sol_30trade_reminder.sh logs "db-read-failed (got 'ERR')" since 2026-07-13 — SOL scope.
-
-## 13. Entry advisor now sees 1H signal IDENTITY (f0a8d30) — statistic deliberately withheld
-One line added: name + matrix weight + age. NO win rate, NO PnL, NO performance. Largest per-signal
-cell is n=6. Attaching a statistic is a SEPARATE decision requiring its own validation and its own n
-— do not add one without it. AI_ADVISOR_HIDE_1H stays True; its documented rationale (avoid
-re-weighing a tier the HTF cascade already gates) concerns DIRECTION, not identity.
-
-## 14. The three zero-row tables — traced 2026-07-27, NONE is the 15m class
-* `breakeven_jobs` — (b) LIVE-PATH ONLY. Enqueued from _execute_entry with a real exchange
-  sl_order_id; paper uses virtual_trader's own breakeven. Zero rows is CORRECT.
-  **ADD TO THE LIVE-PARITY LIST** alongside the LONG partial and the recheck bound.
-* `liquidity_sweep_state` — (d) NEVER TRIGGERED. Handler needs action_field=='context_update' AND
-  raw_signal_type in ('EQH','EQL'); the alerts arrive as tf=5m task=price_action with NO signal_type
-  field, and the router forces 5m to execute_trade. ~300 real Equal Highs/Lows discarded as context.
-  EQH_EQL_SMART_TP_ENABLED=True is irrelevant — checked inside a function never entered.
-  Reviving it is an ALERT-CONFIG change (explicit signal_type + context_update task), not code.
-* `mfe_tracking` — (d) NEVER TRIGGERED, downstream of the same root: its ONLY call site is inside
-  the unreachable sweep handler.
-
-MFE SOURCE — settled: water_mark measures MFE DURING the position (entry->exit) and is the correct
-source; mfe_tracker measured POST-CLOSE MFE (exit->exit+60min), a different question already answered
-better by the post-exit observatory (5 horizons to 24h vs one 60-min window). Today's excursion
-conclusions are unaffected. mfe_tracker is REDUNDANT, not missing.
-
-## 15. EQH/EQL smart-TP — TESTED AND KILLED 2026-07-27. Leave the handler dead.
-No directional edge: EQH and EQL drift the SAME way (EQL-EQH median spread +0.003% at 15m, +0.011%
-at 4h) though the thesis needs opposite signs. Not a volatility proxy either — ADX 25.91 vs 25.08
-baseline, ATR 351.4 vs 351.7, vol 0.20 vs 0.24: indistinguishable from an ordinary 5m moment.
-Simulated on 21,032 real candles: the smart-TP rule fires on 18 positions for **-904 raw / -971 on
-the clean 14**, improving only 5 of 14, and every subsetting keeps the sign. It destroys the short
-side (vpos 58 -435, vpos 50 -403 — large short winners closed early on an EQL while the move ran).
-
-🔴 TRAP FOR A FUTURE SESSION — DO NOT "FIX" THE ROUTING.
-`EQH_EQL_SMART_TP_ENABLED = True` in config READS AS ARMED AND IS NOT. The flag is only ever
-read inside `_handle_liquidity_sweep()` (main.py:2746), and that function is never entered.
-
-MECHANISM (verified 2026-07-27, not inferred): the dispatch gate at main.py:2977 requires
+**Mechanism (verified, not inferred):** the dispatch gate at `main.py:2977` requires
 `action_field == 'context_update' AND raw_signal_type in ('EQH','EQL')`, where `raw_signal_type`
-comes from the PAYLOAD's own `signal_type` field. The live alerts never carry that value, so the
-condition is False on every fire and the sweeps fall through to the generic context path instead.
-PROOF: all 304 EQH/EQL rows in `trades` land with `signal_type='5m_liquidity_ctx'`, and
-`signal_type_ctx` — a column written ONLY at main.py:2766, inside the handler — is NULL on
-304 of 304. The handler has not run once since the alerts went live in May.
+comes from the **payload's own** `signal_type` field. The live alerts never carry that value, so
+the condition is False on every fire and sweeps fall through to the generic context path.
+**PROOF:** all **304** EQH/EQL rows land with `signal_type='5m_liquidity_ctx'`, and
+`signal_type_ctx` — a column written **only** at `main.py:2766`, inside the handler — is NULL on
+**304 of 304**. The handler has not run once since the alerts went live in May.
 
-Restoring reachability is a one-line change (name-based recognition; `classify()` already maps
-'Equal Highs' -> LIQUIDITY/SHORT/eqh/0.9), which is exactly why this is dangerous: anyone who
-"repairs" it without reading the 00:38 report would SILENTLY ARM a rule that loses -971 on the
-clean sample and destroys the short side by closing winning shorts early on an EQL. The
-unreachable branch has been protecting the book — by luck, not by design.
+Restoring reachability is a **one-line change** (`classify()` already maps `Equal Highs →
+LIQUIDITY/SHORT/eqh/0.9`), which is exactly why it is dangerous: anyone "repairing" dead-looking
+dispatch code would **silently arm a rule that loses −971 on the clean sample** and destroys the
+short side by closing winning shorts early on an EQL (vpos 58 −435, vpos 50 −403).
 
-STANDING DECISION: leave BOTH the flag and the routing EXACTLY as they are. Do not flip the flag
-to False (it changes nothing and would make a future reader think the rule was evaluated and
-merely switched off), and do not repair the dispatch. The alerts themselves are correct and
-already do useful work as LIQUIDITY-category matrix weight (0.9) — one input among many at
-entry. That is their role, and it is the only role the data supports.
-Full evidence: reports/2026-07-27-0038-eqh-eql-sweeps-tested-and-killed.md
+**STANDING DECISION: leave BOTH the flag and the routing EXACTLY as they are.** Do not set the
+flag to `False` either — it changes no behaviour and would make a future reader think the rule was
+evaluated and merely switched off, destroying the knowledge this entry exists to preserve.
+The unreachable branch has been protecting the book **by luck, not design**.
+Evidence: `reports/2026-07-27-0038-eqh-eql-sweeps-tested-and-killed.md`
+
+### 2.7 Anthropic API key — exposed 20 days, rotation DECLINED
+Leaked in plaintext to a world-readable sensor log for ~20 days. **Operator declined rotation** —
+the server is single-user with no other access.
+**Done:** root cause fixed on both bots (`set -a; . <env>` replaced with a scoped `_env_get()`
+parser), logs purged, all sensor logs `chmod 600`, nginx `noquery` log format stops the webhook
+passphrase reaching the access log.
+**Revisit only if a second user or external access ever exists.** Not an open task today.
+
+---
+
+## 3. WATCH-LIST — CURRENT REALITY
+
+**Retired** (deleted `d12e276` — they answered their question or their question died):
+`prior-move logger` · `TOLN (tolerate-NEUTRAL)` · `counter-short review`
+
+**Redefined** — the old predicates could never fill again:
+| Sensor | New predicate | N |
+|---|---|---|
+| chop-short | `ema_gap_dir_1h='Flat' AND market_regime='TREND'` (old half included `regime='FLAT'`, which the FLAT score floor drove to zero) | **0 of 5** |
+| regime-FLAT high-ADX | window widened `-3d → -21d` | **5 of 12** |
+
+**Reclassified as DATA SOURCES — these are not watchers, they FEED the exit advisor. Keep them
+running; switching them off silently degrades every exit consultation:**
+`orderbook-density collector` (60s, builds the percentile baseline `_exit_pct()` reads) ·
+`smart-exit dryrun sampler` (live regime + volume in the exit context)
+
+**Genuinely accumulating toward a decision:**
+`volfloor` **4 SHORT / 4 LONG clean** (threshold 6; expiry §2.5) ·
+`exit advisor` **1 of ~10 closed positions** (§2.4)
+
+---
+
+## 4. HYPOTHESES TESTED AND KILLED — DO NOT RE-OPEN WITHOUT NEW EVIDENCE
+
+Ten. Each cost real analysis time. **A hypothesis is re-openable only with data that did not
+exist on 2026-07-27** — not with a fresh intuition.
+
+1. **Prior-4h chase** — the idea that entries chase an already-extended 4h move. No relationship
+   survived contamination filtering.
+2. **Signal → entry slippage** — the delay between alert and fill was proposed as a P&L drain.
+   Measured; it is not material.
+3. **Entry-timing bucket (R2, prior-move)** — first reported at p=0.011/0.027, both **under-filtered**.
+   Correctly filtered: **p = 0.1544**, and the mid bucket collapses from n=8 to **n=1**. An artefact.
+4. **Wall-side misread — DEAD, twice, on two bots by two methods.** The claim was that the advisor
+   confuses a wall above with a wall below and vetoes good trades. Reality: **289 skips citing an
+   ask wall above drifted −0.270%/4h (t = −4.6)** vs −0.051% control, load-bearing subset
+   **−1.509%/24h**. Positive drift = the skip would have won, so **these were the BEST vetoes in
+   the book**. Mercury-SOL reached the same conclusion on 2026-06-30 by replaying 471 historical
+   skips: only 6 flipped (1.3%) and **all six were losers**. 🔴 **Do not re-open.**
+5. **ADX + score chop gate** — the proposed separator fully overlaps winners and losers; the
+   highest-ADX trade (#47) is a **−$127 loser**. Only the 1h EMA-gap 'Flat' tell survived, and it
+   is still only being watched (§3), never shipped.
+6. **Stop-too-tight** — rejected on geometry: stops are a uniform **2.5×ATR**, so "too tight" is
+   not a property the data can express. The stop being the expensive exit is a **horizon**
+   artefact, not a distance one.
+7. **Volume ceiling** — 2 vs 2, p = 0.333. Tested **twice**, failed twice. See §2.5 for the expiry.
+8. **EQH/EQL liquidity sweeps** — no directional edge (EQH and EQL drift the **same** way; the
+   thesis needs opposite signs). Smart-TP simulated at **−971** on the clean sample. Not a
+   volatility proxy either: at sweep moments ADX 25.91 vs 25.08 baseline, ATR 351.4 vs 351.7. §2.6.
+9. **"11 of 11 would have survived their original stop"** — **WRONG, an artefact.**
+   `max_adverse_price` **stops updating at the close**, so it never sees the excursion that
+   followed. On real candles, **8 of 17 hit the original stop.** Never quote stored extrema for a
+   survival question.
+10. **The 5-position counterfactual** — the follow-up figure (−335.84, "the fix would have lost
+    money") was **also wrong**: **survivorship bias in the resolution criterion**, because only
+    fast-resolving positions could resolve on internal data. Settled properly on **13,536 real
+    OHLCV candles**. 🔴 **Regardless of the outcome, do not propose restoring wall-trail or
+    recheck TIGHTEN** — operator's standing instruction.
+
+**The pattern in 3, 9 and 10:** every one was a *stored-column shortcut* standing in for a real
+price path, and every one produced a confident wrong number. When the question is "what would
+price have done", **fetch candles**.
+
+---
+
+## 5. RESOLVED 2026-07-26/27 — closed, recorded so they are not re-investigated
+
+- **Exit advisor existence.** It was **wired but NEVER invoked**: the 5m Group-B trigger has never
+  arrived, and the paper-mode position lookup returned empty. It was not broken — it was
+  unreachable, which reads identically from the outside. Now **live in DRYRUN** on three triggers:
+  **hourly + on 15m confirm + on armed exit** (`ef7fa10`). 3 consults recorded.
+- **Entry-advisor 1H identity gap** — closed (`f0a8d30`). The advisor now sees which named signal
+  set the 1H trend, its weight and its age. **`AI_ADVISOR_HIDE_1H` stays `True`**, and the identity
+  is supplied as a **FACT ONLY — no statistic, win rate or historical performance attached**,
+  deliberately. Renders as: `1H trend set by: Trend Catcher Up, weight 1.0, set 2.2h ago`.
+- **Wall-side misread** — see §4.4. Moved out of open items entirely.
+
+---
+
+## 6. SHIPPED TODAY — seven commits, `6c35b9d..f0a8d30`
+
+| Commit | What it fixed |
+|---|---|
+| `93c20c3` | **Recheck TIGHTEN bound** — new SL can never be tighter than the **ORIGINAL** stop. (Variant B only; Variant A explicitly rejected.) |
+| `596fbdf` | Gated the counter-short caution on `trend_1d != 'bull'` — **superseded hours later by `b878535`**, kept in history to show the stopgap preceded the retirement |
+| `b878535` | **RETIRED the counter-trend EMA-1h soft caution** — its founding statistic does not reproduce and the cohort's sign is **inverted**. 17 lines removed, replaced by a 28-line historical note |
+| `f7df202` | **LONG partial realisation** — 1/3 at +1R, remainder rides the unchanged contract; columns `partial_taken`, `realized_partial_usdt`, folded into `net_pnl` |
+| `ef7fa10` | Persist the 15m entry confirmation + **wire the exit advisor in DRYRUN** (hourly / 15m confirm / armed exit) |
+| `d12e276` | Retire 3 sensors, redefine 2 |
+| `f0a8d30` | Give the entry advisor the **1H signal identity** (fact, not judgement) |
+
+Six distinct changes; `596fbdf` and `b878535` are two commits on one decision that reversed itself
+within the session — recorded that way on purpose.
+
+---
+
+## 7. VERIFIED STATE AT CLOSE — 2026-07-27 01:00 UTC
+
+`git status` **clean** · origin **in sync** · HEAD **`f0a8d30`** · `titan.service` **active**
+(restarted 00:13:32) · `nginx -t` **successful**, `noquery` format live · **Mercury-SOL untouched
+and active**
+
+**Flags live:** `LONG_PARTIAL_ENABLED=True` (1.0R, 1/3) · `EXIT_ADVISOR_PAPER_ENABLED=True`
+`DRYRUN=True` `ON_15M_CONFIRM=True` `HOURLY=True` (3600s) · `CONFLUENCE_FLAT_THRESHOLD=5.0` ·
+`WALL_TRAIL_LIVE_ENABLED=False` · `AI_ADVISOR_HIDE_1H=True` · `ADX_BELOW_FLOOR=20.0` ·
+🔴 `LIVE_TRADING_ENABLED=False` · ⚠️ `EQH_EQL_SMART_TP_ENABLED=True` **(unreachable — see §2.6)**
+
+**Titan crons — 4 daily + 1 weekly:**
+`17 8` bull-regime · `29 8` chop-short · `35 8` volfloor · `53 8` regime-FLAT high-ADX ·
+`11 8 * * 1` daily-trend-cohort (weekly)
+
+**Book:** 0 open positions. Last close vpos 82 LONG **+53.79** (trail, partial +18.91).
+
+---
+
+## 8. REPORTING CONVENTION — for any session writing this up
+
+Full reports go to the **`kola-reports` repo**, `reports/YYYY-MM-DD-HHMM-<name>.md`. The operator
+reads them via **`raw.githubusercontent.com`** links. **Gist raw URLs are blocked** (robots-
+disallowed) — a gist link delivers an empty file and the report effectively did not exist.
+**Patches go INLINE in the same `.md`** as a fenced block, never as a separate `.patch` file:
+**one link, one complete document.** Secret/PII scan is **fail-closed before every push** — the
+repo is public. Telegram gets a short decision summary **plus the single raw link**, not the report.
