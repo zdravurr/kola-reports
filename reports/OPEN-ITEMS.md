@@ -228,3 +228,17 @@ MFE SOURCE — settled: water_mark measures MFE DURING the position (entry->exit
 source; mfe_tracker measured POST-CLOSE MFE (exit->exit+60min), a different question already answered
 better by the post-exit observatory (5 horizons to 24h vs one 60-min window). Today's excursion
 conclusions are unaffected. mfe_tracker is REDUNDANT, not missing.
+
+## 15. EQH/EQL smart-TP — TESTED AND KILLED 2026-07-27. Leave the handler dead.
+No directional edge: EQH and EQL drift the SAME way (EQL-EQH median spread +0.003% at 15m, +0.011%
+at 4h) though the thesis needs opposite signs. Not a volatility proxy either — ADX 25.91 vs 25.08
+baseline, ATR 351.4 vs 351.7, vol 0.20 vs 0.24: indistinguishable from an ordinary 5m moment.
+Simulated on 21,032 real candles: the smart-TP rule fires on 18 positions for **-904 raw / -971 on
+the clean 14**, improving only 5 of 14, and every subsetting keeps the sign. It destroys the short
+side (vpos 58 -435, vpos 50 -403 — large short winners closed early on an EQL while the move ran).
+
+🔴 TRAP FOR A FUTURE SESSION: `EQH_EQL_SMART_TP_ENABLED = True` in config READS AS ARMED AND IS NOT —
+it is checked inside a function that is never entered. Anyone who fixes the routing (name-based
+recognition would be trivial; classify() already maps 'Equal Highs' -> LIQUIDITY/SHORT/eqh/0.9)
+would arm a loss-making rule by accident. The unreachable branch has been protecting the book.
+The alerts themselves are fine and already contribute LIQUIDITY matrix weight — that is their role.
