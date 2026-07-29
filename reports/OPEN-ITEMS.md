@@ -333,6 +333,28 @@ liquidation endpoint on 2026-05-15. Nothing to delete there.
 | `skip_drift_samples` / `skip_attribution` | 38,480 / 7,696 | used ad hoc; no standing plan |
 | `post_exit_drift_samples` / `post_exit_observatory` | 185 / 38 | **no plan recorded at all** |
 
+### 2.20 🔴 NEW — THE FIVE CRON SENSORS ARE NOT UNDER VERSION CONTROL
+Found while committing `41c4a4d`. `.gitignore` is deny-all-then-whitelist and only admits
+`titan-bot/**/*.py`, so **every `*.sh` sensor is untracked**:
+`titan_bull_regime_watch.sh` · `titan_regime_flat_high_adx_watch.sh` ·
+`titan_chop_short_flat_gap_watch.sh` · `titan_volfloor_data_watch.sh` (+ the Mercury-SOL ones).
+
+Consequences, all real:
+- **No history.** `d12e276` records "retire 3 sensors, redefine 2" in its message, but the actual
+  predicate changes are in **no diff anywhere**. The only record of what a sensor used to measure is
+  prose.
+- **No rollback.** Today's three sensor edits (edge-trigger + two expiries) exist **only on disk**.
+  They are verified working — each was executed before and after — but they are not in `41c4a4d`,
+  which contains `claude_advisor.py` alone.
+- ⚠️ **Disclosure:** I made `.bak_20260729` copies before editing and then deleted them in the same
+  step that staged the commit. Since the files are untracked, **the pre-edit versions of those three
+  scripts no longer exist.** The edits are additive and verified; nothing is broken. But the undo is
+  gone, and I should not have removed backups of files git was not holding.
+
+**Recommendation (NOT applied — changing `.gitignore` is a repo-policy decision):** whitelist
+`!titan-bot/**/*.sh` so the watch-list machinery is versioned like everything else. Until then,
+treat the sensor scripts as production code with no safety net.
+
 ### 2.19 ✅ `entry_tiers_json` WRITE PATH — VERIFIED LIVE 2026-07-29
 The gap flagged in the `7285c5d` and `4fc89ea` reports is closed. **vpos 85 (trades row 19468,
 2026-07-29 13:50) is the first entry executed since the tier work**, and `entry_tiers_json` is
