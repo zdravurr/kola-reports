@@ -6,7 +6,8 @@
 Titan is a **BTC swing paper-trading bot**. `LIVE_TRADING_ENABLED = False`. All P&L below is paper
 P&L from the `virtual_positions` table.
 
-_Last updated: **2026-07-27 01:00 UTC** — full rewrite at Titan session close. HEAD `f0a8d30`._
+_Last updated: **2026-07-29 11:45 UTC** — §2.3 closed (`8b15ecc`), §2.8/§2.9/§2.10 added after the
+signal-tier fix (`7285c5d`). HEAD **`7285c5d`**._
 
 ---
 
@@ -66,17 +67,15 @@ Was not tested because the excursion data needed to judge it (full price path be
 exit, per position) was not assembled. **It is not a rejected idea — it is an unasked question.**
 Closing it needs excursion-path coverage on real candles, the same method §4.10 settled on.
 
-### 2.3 🔴 Entry advisor gets an uninformative wall label — LIVE ASYMMETRY
-The entry advisor receives the **hard-coded word "Massive"** for every wall above `4.0x`, with
-**no percentile scale**. **100% of observed book states contain such a wall**, so the label carries
-**zero information** — it is a constant being read as an alarm.
-
-The **exit** advisor was given the percentile scale in `ef7fa10` (`_exit_pct()` against the
-`orderbook_density` baseline). The **entry** advisor was not. **The two advisors now describe the
-same order book in two different languages** — this asymmetry is the gap, and it is live.
-
-Closing it: feed the entry advisor the same `orderbook_density` percentile the exit side uses.
-The baseline table is already populated by the always-on collector (§3).
+### 2.3 ✅ CLOSED 2026-07-29 (`8b15ecc`) — entry advisor now has the percentile scale
+The entry advisor received the **hard-coded word "Massive"** for every wall above `4.0x` with no
+percentile scale, while 100% of observed book states contain such a wall — a constant read as an
+alarm. `main._entry_book_pct()` now calls the **same `_exit_pct()`** against the **same
+`orderbook_density`** baseline the exit side has used since `ef7fa10`, and the label is deleted.
+The system prompt's opposing-wall HARD RULE now judges thickness by the printed percentile too.
+Left open on the **exit** side: `depth_pct` in the close prompt has always rendered `n/a` —
+`_build_exit_context` never sets it. Two lines. Evidence:
+`reports/2026-07-29-1011-titan-entry-advisor-percentiles-and-two-entry-forensics.md`
 
 ### 2.4 Exit-advisor activation criterion — RECORDED BEFORE ANY DATA EXISTED
 Written down **deliberately in advance** so the bar cannot be moved after seeing results.
@@ -130,6 +129,57 @@ the server is single-user with no other access.
 parser), logs purged, all sensor logs `chmod 600`, nginx `noquery` log format stops the webhook
 passphrase reaching the access log.
 **Revisit only if a second user or external access ever exists.** Not an open task today.
+
+### 2.8 🔴 BEHAVIOURAL CHANGE — WATCH ENTRY FREQUENCY (opened 2026-07-29, `7285c5d`)
+**WATCH, do not act.** The entry advisor now sees `ABSENT` tiers and an honest agreement line where
+it was previously told *"The 3 timeframes are aligned (confluence has already passed)"* — a sentence
+that was **false** on 14 of 59 executed entries, printed directly above `15m: n/a`.
+
+**It may skip entries it would previously have approved.** That is the expected consequence of
+removing a false statement, **not a regression** — but it must be **measured, not assumed.**
+
+**The measurement, over ~2 weeks from 2026-07-29 11:36 UTC** (restart time; compare against the
+equal-length window before it):
+- the advisor's **skip rate** — `ai_skipped / (ai_skipped + executed)` on rows that cleared the score gate
+- the **executed-entry count**
+
+Baseline for the prior period, already computed: over 2026-07-06 → 07-29, **610** signals cleared
+the score gate and **17** became trades = **2.79%**. 14 of 59 executed entries ever (24%) carried
+the false alignment claim.
+
+**Do not "fix" a drop by reverting.** A lower entry count with the same or better P&L is the
+intended outcome. Only a drop **to near zero**, or a drop with **no change in the quality** of what
+survives, is evidence of a defect.
+
+### 2.9 TWO REGISTRIES HOLD THE SAME FACT AND DISAGREE — BY DESIGN. NOT PROPOSED.
+`state_machine`'s 15m slot and `signal_matrix`'s MOMENTUM category both record "the 15m tier", and
+they **diverge in both directions**:
+
+| | `state_machine` 15m slot | `signal_matrix` MOMENTUM |
+|---|---|---|
+| TTL | **4 h** | **90 min** (cut 240→90 on 2026-05-20) |
+| wiped by 1H flip / Group-B Exit | **YES** (`_clear_lower_tfs_locked`) | **NO** |
+| read by | the **prompt** | the **score gate** and the HTF cascade |
+
+Measured on the last 20 executed entries: **2** had an empty slot while the matrix held **3 live**
+MOMENTUM signals; **6** had a live slot the matrix had already expired.
+
+**`7285c5d` reports BOTH rather than picking one** — a tier the gate did not count says so, and a
+tier whose slot and matrix directions disagree says so. **Reconciling the two registries is a
+cascade-state change and is NOT proposed.** Anyone tempted should first read §2.8: the divergence is
+also what makes the honest `ABSENT` rendering necessary.
+
+### 2.10 AGE IS THE AGE OF LAST SET, NOT OF FIRING
+`reset_1h_trend()` sets `direction = NEUTRAL` and **overwrites the slot `timestamp` with the reset
+time while keeping the signal name.** So a reset tier's age is the age of the **reset**, not of the
+signal. Live example — entry 19021: the prompt read *"1H trend set by: Trend Catcher Down, weight
+1.0, set 1.0h ago"* when *Trend Catcher Down* had actually fired **2.0h** earlier (23:00:16) and an
+Exit Signal had neutralised the tier at 00:00:29.
+
+**`7285c5d` labels it `last set` rather than lying**, and now also prints the direction, so a reset
+tier shows as `NEUTRAL` instead of reading as live. **A proper fix needs a separate `set_at` field
+in `state_machine`, written only when a NEW signal arrives and preserved across resets — a
+cascade-state change, out of scope, deliberately not done.** Recorded here so it is not rediscovered.
 
 ---
 
