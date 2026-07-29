@@ -6,9 +6,10 @@
 Titan is a **BTC swing paper-trading bot**. `LIVE_TRADING_ENABLED = False`. All P&L below is paper
 P&L from the `virtual_positions` table.
 
-_Last updated: **2026-07-29 13:35 UTC** — §2.3 closed (`8b15ecc`), §2.11 closed (`4fc89ea`),
+_Last updated: **2026-07-29 14:00 UTC** — §2.3 closed (`8b15ecc`), §2.11 closed (`4fc89ea`),
 §2.8/§2.9/§2.10 added (`7285c5d`), §1 CORRECTED and §2.12–§2.17 opened after the full loose-ends
-sweep. §2.12 and §2.13 CLOSED by `c307bb7`. HEAD **`c307bb7`**._
+sweep. §2.12/§2.13 CLOSED by `c307bb7`; §2.14/§2.15 CLOSED and §2.2 ANSWERED by `41c4a4d`.
+HEAD **`41c4a4d`**._
 
 ---
 
@@ -75,10 +76,57 @@ survived simulation**, not as optima. Retune at **~30 clean longs reaching above
 rode the unchanged contract to a trail exit, **total +53.79**. One datapoint. It proves the
 mechanism executes and folds into `net_pnl`; it proves **nothing** about the parameters.
 
-### 2.2 Variant C (narrower LONG trail) — UNEVALUATED, not rejected
-Was not tested because the excursion data needed to judge it (full price path between entry and
-exit, per position) was not assembled. **It is not a rejected idea — it is an unasked question.**
-Closing it needs excursion-path coverage on real candles, the same method §4.10 settled on.
+### 2.2 Variant C (narrower LONG trail) — STUDIED 2026-07-29. STRUCTURE only; WIDTH undecidable.
+Simulated on **real 5m candle paths** (18,900 bars), replicating the live contract exactly —
+1R stop, breakeven + trail arming at +1R, never-loosen, intrabar resolved ADVERSELY. Validated at
+width 1.0 against the 10 clean closed positions: all four stop-outs reproduce at −1.00R vs a real
+−1.09…−1.20 (the difference is fees), trails reproduce within 0.11–0.13R.
+
+🔴 **THE CRUX: the trail only arms at +1R, and almost nothing gets there.**
+Of the 10 clean closed positions, **3 of 5 LONGs and 4 of 5 SHORTs NEVER ARMED IT.**
+A position that never reaches +1R is **identical under every trail width**, so the width question
+has an effective **n of 2 (LONG) and 1 (SHORT)**.
+
+| width | LONG net R (n=5) | winners cut | losers improved |
+|---|---|---|---|
+| **1.0 (today)** | **+0.46** | — | — |
+| 0.75 | +0.96 | 0 | 0 |
+| 0.6 | +1.26 | 0 | 0 |
+| 0.5 | +1.46 | 0 | 0 |
+
+Monotone and entirely driven by **two positions** (vpos 79 and 82). The other three are byte-identical
+across all four widths. "0 winners cut" is a two-observation coincidence, not a property.
+
+🔴 **SHORT CONTROL — 0.5R IS DISQUALIFIED.** Re-simulated from entry on the 8 short runners
+(43, 44, 46, 48, 49, 57, 58, 81; MFE 1.87R–3.40R):
+| width | total R across the 8 runners |
+|---|---|
+| 1.0 | **+13.57** |
+| 0.75 | +13.06 |
+| 0.6 | +14.01 |
+| **0.5** | **+8.67 — the tail is destroyed (−36%)** |
+vpos 58 falls 2.41R → 1.07R, vpos 46 2.31R → 0.81R. The 0.6/0.75 differences are non-monotone,
+i.e. noise. **Any narrowing must be LONG-ONLY, and 0.5R is out for shorts on this evidence.**
+
+**Interaction with the LONG partial (`f7df202`) — they are SUBSTITUTES, not complements:**
+| width | LONG net R, no partial | WITH the 1/3 @ +1R partial | partial's contribution |
+|---|---|---|---|
+| 1.0 | +0.46 | **+0.76** | **+0.30** ← today's live contract |
+| 0.75 | +0.96 | +1.10 | +0.13 |
+| 0.6 | +1.26 | +1.30 | +0.03 |
+| 0.5 | +1.46 | +1.43 | **−0.03** |
+Both solve the same problem — banking before giveback — so stacking them gives diminishing and then
+NEGATIVE returns. **A narrower trail plus the partial is not the sum of the two.**
+
+**VERDICT: enough to choose a STRUCTURE, nowhere near enough to choose a WIDTH.**
+- Structure supported: *longs give back too much at 1.0R, and narrowing helps them without touching
+  shorts*. Direction is consistent across both informative longs and both partial variants.
+- Width NOT supported: n = 2 armed longs. Any width chosen today is fitted to vpos 79 and 82.
+- **What the parameter needs:** ARMED longs, not merely closed ones. Historical arming rate is
+  **22% for LONGs** (5 of 23) — a stricter bar than §2.1's ">0.5R". At 0.74 closed positions/day
+  that is ~0.13 armed longs/day → **20 armed longs ≈ 5 months, 30 ≈ 7.5 months.**
+- 🔴 **Do NOT apply a width on this evidence.** Not applied, by design.
+Full study: `reports/2026-07-29-1400-titan-variant-c-and-final-cleanup.md`
 
 ### 2.3 ✅ CLOSED 2026-07-29 (`8b15ecc`) — entry advisor now has the percentile scale
 The entry advisor received the **hard-coded word "Massive"** for every wall above `4.0x` with no
@@ -101,7 +149,11 @@ Written down **deliberately in advance** so the bar cannot be moved after seeing
 > beats the actual exit **both in total USDT and in positions improved**.
 > **No partial credit. No re-cutting the sample. First verdict only** — not its best verdict.
 
-🔴 **Progress: 0 of ~10 — RESTARTED at `c307bb7`, 2026-07-29 13:21 UTC (see §2.18).**
+🔴 **Progress: 1 of ~10 — RESTARTED at `c307bb7`, 2026-07-29 13:21 UTC (see §2.18).**
+**First post-restart datapoint: vpos 84**, closed 13:30:08 at **+16.54**. Its only verdict under the
+corrected prompt was `hold` (row 19460, 13:30:08); **no `close` verdict was ever issued**, so it is
+NEUTRAL for the criterion — the advisor neither improved nor worsened the exit. Same shape as the
+discarded vpos 82.
 The pre-fix count was 2 of ~10 (vpos 82, vpos 83); both are contaminated and are no longer counted.
 
 Historical record of the discarded pair: **59 consults** recorded. vpos 82: no `close`
@@ -238,14 +290,20 @@ ATR% and EMA-gap figure, raw, on every timeframe; it is no longer told what they
 `ADX_BELOW_FLOOR`, the post-entry recheck, the score gate and the cascade are untouched — this was
 prompt text only. **Do not reintroduce a threshold without a study and a review date.**
 
-### 2.14 `Long/Short ratio` has NO PRODUCER — 100% of entry prompts say `n/a`
+### 2.14 ✅ CLOSED 2026-07-29 (`41c4a4d`) — `Long/Short ratio` line DELETED
 `mc_ls_ratio` is NULL on **all 18,505** `trades` rows. Three references exist in the entire
 codebase: the column declaration (`main.py:220`), the parameter default (`claude_advisor.py:241`)
 and the render (`claude_advisor.py:363`). **There is no fetcher.** Siblings `mc_recent_liq_long_usd`
 and `mc_recent_liq_short_usd` are equally empty.
-Either implement it or delete the line — a prompt line that always says `n/a` is pure noise.
+**DELETED rather than implemented**, by operator decision: a field that has never had a producer is
+not a feature we are missing. `_ENTRY_SYSTEM` no longer claims the model receives it; the `ls_ratio`
+parameter stays in the signature and is ignored so both `main.py` call sites remain valid.
+Verified on the first real entry after the change (vpos 85, trades row 19468): the string `n/a` now
+appears **nowhere** in the entry prompt.
+The siblings render nowhere — `market_context.py` already records that BingX removed the REST
+liquidation endpoint on 2026-05-15. Nothing to delete there.
 
-### 2.15 TWO SENSORS ARE STARVED; ONE FIRES EVERY DAY
+### 2.15 ✅ CLOSED 2026-07-29 (`41c4a4d`) — two sensors EXPIRED, one EDGE-TRIGGERED
 - `regime-FLAT high-ADX` — **5 / 12 and the arrival rate is ZERO**: 0 in the last 7 days, all 5 rows
   sit in the 14–21 day band of a rolling 21-day window and **age out this week, so N goes DOWN**.
   Its predicate needs `trend_4h='bull'`, which fell from 34.9% to **7.9%** of rows. **A rolling
@@ -255,16 +313,38 @@ Either implement it or delete the line — a prompt line that always says `n/a` 
 - `titan_bull_regime_watch` — **fires EVERY day** (157, 54, 56, 56). Its question is answered; it is
   now a daily Telegram generator, and noise is how a real alert gets missed.
 
-**Give the two starved sensors an EXPIRY the way §2.5 has one, or they will sit in the watch-list
-forever looking like progress.** Not done today — retiring a sensor is an operator call.
+**DONE 2026-07-29 (`41c4a4d`):**
+- 🔴 **Both starved sensors now carry `EXPIRES 2026-09-30`** with the delete-if-not-reached rule
+  **enforced by the script itself**: after that date each stops measuring, sends one
+  *"DELETE the script and its cron line — do not extend the date"* Telegram, and exits. Verified by
+  dry-running both at a simulated 2026-10-01. **The date is deliberately the SAME as the volume
+  ceiling (§2.5): one expiry review to remember, not three.**
+- **`titan_bull_regime_watch` is now EDGE-TRIGGERED** — it fires once on the TRANSITION into the
+  bull regime and logs the transition out, instead of firing on the standing condition every day.
+  State in `.state_bull_regime_watch` (delete the file to re-arm). Verified: first run fired, second
+  run stayed quiet. Redefined rather than retired because the question it watches — the LONG regime
+  drill, which needs a real daily uptrend — is still genuinely open.
 
 ### 2.16 THINGS ACCUMULATING WITH NO ANALYSIS PLAN
 | table | rows | plan |
 |---|---|---|
-| `position_excursion_samples` | **2,875** | 🔴 **§2.2 Variant C needs exactly this and nobody has run it.** The data missing on 07-27 now exists. |
+| `position_excursion_samples` | 2,885 | ✅ **§2.2 Variant C RUN 2026-07-29.** In the end the study used real 5m candles rather than these samples (§0 filter 4: never stored extrema for a path question); the table confirmed coverage. |
 | `smart_exit_dryrun_samples` | 228 | the chop-exit re-cut (`config.py:293`) has **never been done** |
 | `skip_drift_samples` / `skip_attribution` | 38,480 / 7,696 | used ad hoc; no standing plan |
 | `post_exit_drift_samples` / `post_exit_observatory` | 185 / 38 | **no plan recorded at all** |
+
+### 2.19 ✅ `entry_tiers_json` WRITE PATH — VERIFIED LIVE 2026-07-29
+The gap flagged in the `7285c5d` and `4fc89ea` reports is closed. **vpos 85 (trades row 19468,
+2026-07-29 13:50) is the first entry executed since the tier work**, and `entry_tiers_json` is
+present and correct: all three tiers with name, direction, weight, age and the agreement line,
+JSON round-tripped. The rendering was already verified; the persistence now is too.
+
+⚠️ **One observation from that same entry, recorded as a FACT, not a finding (n=1):** the prompt
+stated *"Agreement: 5m points LONG; 15m points SHORT; vs the proposed LONG: 5m agree, 15m OPPOSE"*,
+and the advisor's reason came back *"1h/15m/5m agree on upside"* — it asserted an agreement the
+prompt had explicitly denied. The tier block did its job; the advisor contradicted it. **One entry
+proves nothing about advisor quality — but this is exactly the disagreement that was INVISIBLE
+before `7285c5d` and is now auditable on every entry.** Worth watching alongside §2.8.
 
 ### 2.17 ✅ FOUR SILENT DRYRUN FLAGS — TRACED AND CLEARED (not a defect)
 `WALL_ANCHOR_DRYRUN_ENABLED`, `TREND_REVERSAL_EXIT_DRYRUN`, `DXY_HALT_DRYRUN` and
@@ -405,7 +485,7 @@ price have done", **fetch candles**.
 
 ---
 
-## 6. SHIPPED 2026-07-26 → 07-29 — thirteen commits, `6c35b9d..c307bb7`
+## 6. SHIPPED 2026-07-26 → 07-29 — fourteen commits, `6c35b9d..41c4a4d`
 
 | Commit | What it fixed |
 |---|---|
@@ -421,6 +501,7 @@ price have done", **fetch candles**.
 | `7285c5d` | **2026-07-29** — all THREE tiers to both advisors with name/direction/weight/age + an explicit agreement line; `ABSENT` replaces `n/a`; new `entry_tiers_json` column; the false "3 timeframes are aligned" sentence removed |
 | `4fc89ea` | **2026-07-29** — EXIT prompt's "Total depth" line populated (had rendered `n/a` on 100% of consultations) |
 | `c307bb7` | **2026-07-29** — two prompt claims replaced by facts: the false trail promise (§2.12) and the ADX "~<20-23" threshold plus the FLAT-MARKET GUARD rule built on it (§2.13) |
+| `41c4a4d` | **2026-07-29** — cleanup: `Long/Short ratio` line deleted (§2.14); bull-regime watcher edge-triggered; the two starved sensors given an enforced 2026-09-30 expiry (§2.15) |
 
 `596fbdf` and `b878535` are two commits on one decision that reversed itself within a session —
 recorded that way on purpose.
@@ -432,10 +513,10 @@ break a trade.
 
 ---
 
-## 7. VERIFIED STATE AT CLOSE — 2026-07-29 13:35 UTC
+## 7. VERIFIED STATE AT CLOSE — 2026-07-29 14:00 UTC
 
-`git status` **clean** · origin **in sync** · HEAD **`c307bb7`** · `titan.service` **active**
-(restarted 2026-07-29 13:21:47, 0 errors since) · `nginx -t` **successful**, `noquery` format live · **Mercury-SOL untouched
+`git status` **clean** · origin **in sync** · HEAD **`41c4a4d`** · `titan.service` **active**
+(restarted 2026-07-29 13:49:47, 0 errors since) · `nginx -t` **successful**, `noquery` format live · **Mercury-SOL untouched
 and active**
 
 **Flags live:** `LONG_PARTIAL_ENABLED=True` (1.0R, 1/3) · `EXIT_ADVISOR_PAPER_ENABLED=True`
@@ -447,8 +528,8 @@ and active**
 `17 8` bull-regime · `29 8` chop-short · `35 8` volfloor · `53 8` regime-FLAT high-ADX ·
 `11 8 * * 1` daily-trend-cohort (weekly)
 
-**Book:** 1 open position — vpos 84 LONG @ 63,997.3, stop 63,129.9 (original), partial not fired.
-Last close vpos 83 SHORT **−143.67** (stop).
+**Book:** 1 open position — **vpos 85 LONG @ 64,604.4** (opened 13:50:18), stop 63,787.5.
+Last close **vpos 84 LONG +16.54** (external/armed exit, 13:30:08).
 
 ---
 
