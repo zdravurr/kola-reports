@@ -6,8 +6,9 @@
 Titan is a **BTC swing paper-trading bot**. `LIVE_TRADING_ENABLED = False`. All P&L below is paper
 P&L from the `virtual_positions` table.
 
-_Last updated: **2026-07-29 11:45 UTC** — §2.3 closed (`8b15ecc`), §2.8/§2.9/§2.10 added after the
-signal-tier fix (`7285c5d`). HEAD **`7285c5d`**._
+_Last updated: **2026-07-29 12:45 UTC** — §2.3 closed (`8b15ecc`), §2.11 closed (`4fc89ea`),
+§2.8/§2.9/§2.10 added (`7285c5d`), §1 CORRECTED and §2.12–§2.15 opened after the full loose-ends
+sweep. HEAD **`4fc89ea`**._
 
 ---
 
@@ -33,16 +34,28 @@ won**. Reading it backwards inverts every veto conclusion. This caused a real in
 
 ## 1. 🔴 LIVE-PATH PARITY GAP — BLOCKING before `LIVE_TRADING_ENABLED = True`
 
-**Three mechanisms exist in the paper path only:**
+🔴 **CORRECTED 2026-07-29: this list said THREE. There are at least SEVEN, and one entry was
+recorded BACKWARDS.** Measured by presence in `virtual_trader.py` vs `main.py`:
 
-| Mechanism | Commit | Lives in |
-|---|---|---|
-| LONG partial realisation (1/3 at +1R) | `f7df202` | `virtual_trader.py` |
-| Recheck TIGHTEN original-SL floor | `93c20c3` | `virtual_trader.py` |
-| `breakeven_jobs` | (pre-existing) | `virtual_trader.py` |
+| Mechanism | virtual_trader | main (live) | was it listed? |
+|---|---|---|---|
+| LONG partial realisation (1/3 at +1R, `f7df202`) | 7 refs | **0** | yes |
+| Recheck TIGHTEN + original-SL floor (`93c20c3`) | 52 refs | 1 | yes |
+| `original_sl_price` / the 1R reference itself | 17 refs | 1 | **no** |
+| **WALL_ANCHOR** | 7 refs | **0** | **no** |
+| **adaptive_trail** | 5 refs | 0 (3 in `breakeven_worker`) | **no** |
+| **EXCURSION_LOGGING** | 2 refs | **0** | **no** |
+| **SMART_EXIT_DRYRUN** | 9 refs | **0** | **no** |
+| `breakeven_jobs` | own +1R poller | **table is LIVE-only, 0 rows ever** | **recorded backwards** |
+
+**`breakeven_jobs` does NOT live in `virtual_trader.py`.** The table is written only by
+`breakeven_worker.py`, whose `enqueue()` is called from the LIVE entry path (`main.py:1411`,
+`main.py:4348`). It has **zero rows in its entire life** because live trading has never run. The
+paper path has a *separate* +1R implementation inside `virtual_trader`. The divergence is real; the
+direction was written down wrong, and the direction is what matters when planning the rewrite.
 
 Enabling live trading today would run a **materially different strategy** from the one being
-measured — no partial, no stop floor, no breakeven jobs.
+measured.
 
 **OPERATOR'S DECISION (2026-07-26), do not deviate:** rewrite the engine as **ONE code path with
 two adapters** — orders either go to the exchange or are simulated — **NOT** piecemeal porting of
@@ -73,9 +86,13 @@ percentile scale, while 100% of observed book states contain such a wall — a c
 alarm. `main._entry_book_pct()` now calls the **same `_exit_pct()`** against the **same
 `orderbook_density`** baseline the exit side has used since `ef7fa10`, and the label is deleted.
 The system prompt's opposing-wall HARD RULE now judges thickness by the printed percentile too.
-Left open on the **exit** side: `depth_pct` in the close prompt has always rendered `n/a` —
-`_build_exit_context` never sets it. Two lines. Evidence:
-`reports/2026-07-29-1011-titan-entry-advisor-percentiles-and-two-entry-forensics.md`
+Evidence: `reports/2026-07-29-1011-titan-entry-advisor-percentiles-and-two-entry-forensics.md`
+
+### 2.11 ✅ CLOSED 2026-07-29 (`4fc89ea`) — exit prompt's "Total depth" line
+It rendered **`n/a` on 100% of the 59 exit consultations ever made**: the field was in the template
+and `_build_exit_context` never set `depth_pct`. Now read from the latest `orderbook_density` row,
+percentiled through the same `_exit_pct()` baseline, with the sample age printed so a stale row is
+visible. Both advisors now describe depth in the same language.
 
 ### 2.4 Exit-advisor activation criterion — RECORDED BEFORE ANY DATA EXISTED
 Written down **deliberately in advance** so the bar cannot be moved after seeing results.
@@ -84,12 +101,14 @@ Written down **deliberately in advance** so the bar cannot be moved after seeing
 > beats the actual exit **both in total USDT and in positions improved**.
 > **No partial credit. No re-cutting the sample. First verdict only** — not its best verdict.
 
-**Progress: 1 of ~10 closed** (vpos 82, closed 2026-07-27 00:07). 3 consults recorded so far
-(rows 18773, 18789, 18796) — all `hold`, so no verdict has yet been tested against an exit.
+**Progress: 2 of ~10 closed** (vpos 82, vpos 83). **59 consults** recorded. vpos 82: no `close`
+verdict ever issued (actual +53.79 kept). vpos 83: first `close` at 2026-07-28 04:00:51 would have
+been **+23.61 gross vs the actual −135.80** — an improvement of ~159 USDT. Running tally: **improved
+1, worsened 0, neutral 1.** Eight more closes needed; the bar does not move.
 Currently `EXIT_ADVISOR_DRYRUN = True`: it can never close a position.
 
 ### 2.5 Volume ceiling — NOT BUILT, and has an EXPIRY
-Clean n is **4 SHORT / 4 LONG**. SHORT **p = 0.333**; LONG **contradicts** the thesis (p = 1.000).
+Clean n is **5 SHORT / 4 LONG** (2026-07-29). SHORT **p = 0.333**; LONG **contradicts** the thesis (p = 1.000).
 
 The earlier, exciting **p = 0.048 came from three contaminated rows** (vpos 66, 68, 74). The
 sensor that reported it has since been fixed to count clean rows only.
@@ -181,6 +200,67 @@ tier shows as `NEUTRAL` instead of reading as live. **A proper fix needs a separ
 in `state_machine`, written only when a NEW signal arrives and preserved across resets — a
 cascade-state change, out of scope, deliberately not done.** Recorded here so it is not rediscovered.
 
+### 2.12 🔴 EXIT PROMPT PROMISES A TRAIL THAT DOES NOT EXIST — 56 of 59 consultations
+The close prompt ends with *"The stop and trail remain active if you HOLD."* **The trail arms at
++1R.** Of the 59 exit consultations ever made, **56 (94.9%) happened with MFE below 1.0R**, i.e. no
+trail existed at all. The sentence asserts a protection that is not there, **in the direction that
+makes holding look safer than it is.**
+
+Exactly the class of *"The 3 timeframes are aligned"* (closed by `7285c5d`), at a higher rate, and
+**still live**. NOT fixed on 2026-07-29 because rewording an exit-side instruction changes advisor
+behaviour and that is an operator decision, not a plumbing fix.
+**This is the highest-value remaining item on Titan.**
+
+### 2.13 🔴 THE ADX "~<20-23 = weak/ranging" LABEL IS A HARD-CODED CONSTANT WITH NO REVIEW DATE
+It appears twice: as a label in the volatility block (`claude_advisor.py:334`) and **inside the
+FLAT-MARKET GUARD soft rule** in `_ENTRY_SYSTEM`. A textbook ADX cut-off, asserted to the model as
+fact, never validated on this book — and **contradicted by our own measurement**: the 2026-07-29
+regime study found that on skipped signals ADX 25–30 drifts **−0.34%/24h** while ADX < 20 drifts
+**+0.46%** (t = +2.94). High ADX marks the skips that were RIGHT.
+
+Same class as "Massive" (§2.3) and the same failure mode that forced the counter-short caution's
+retirement (§4.5): a number nobody re-checked — except this one was never checked at all.
+**Either validate it or retire it. Leaving it is how the last one happened.**
+
+### 2.14 `Long/Short ratio` has NO PRODUCER — 100% of entry prompts say `n/a`
+`mc_ls_ratio` is NULL on **all 18,505** `trades` rows. Three references exist in the entire
+codebase: the column declaration (`main.py:220`), the parameter default (`claude_advisor.py:241`)
+and the render (`claude_advisor.py:363`). **There is no fetcher.** Siblings `mc_recent_liq_long_usd`
+and `mc_recent_liq_short_usd` are equally empty.
+Either implement it or delete the line — a prompt line that always says `n/a` is pure noise.
+
+### 2.15 TWO SENSORS ARE STARVED; ONE FIRES EVERY DAY
+- `regime-FLAT high-ADX` — **5 / 12 and the arrival rate is ZERO**: 0 in the last 7 days, all 5 rows
+  sit in the 14–21 day band of a rolling 21-day window and **age out this week, so N goes DOWN**.
+  Its predicate needs `trend_4h='bull'`, which fell from 34.9% to **7.9%** of rows. **A rolling
+  window with a fixed threshold can never fire when arrivals < expiries.**
+- `chop-short` — **0 / 5**; the cohort has produced 2 rows in two months and **0 since the FLAT
+  floor**. At 0.7 closed positions/day this is a multi-month wait.
+- `titan_bull_regime_watch` — **fires EVERY day** (157, 54, 56, 56). Its question is answered; it is
+  now a daily Telegram generator, and noise is how a real alert gets missed.
+
+**Give the two starved sensors an EXPIRY the way §2.5 has one, or they will sit in the watch-list
+forever looking like progress.** Not done today — retiring a sensor is an operator call.
+
+### 2.16 THINGS ACCUMULATING WITH NO ANALYSIS PLAN
+| table | rows | plan |
+|---|---|---|
+| `position_excursion_samples` | **2,875** | 🔴 **§2.2 Variant C needs exactly this and nobody has run it.** The data missing on 07-27 now exists. |
+| `smart_exit_dryrun_samples` | 228 | the chop-exit re-cut (`config.py:293`) has **never been done** |
+| `skip_drift_samples` / `skip_attribution` | 38,480 / 7,696 | used ad hoc; no standing plan |
+| `post_exit_drift_samples` / `post_exit_observatory` | 185 / 38 | **no plan recorded at all** |
+
+### 2.17 FLAGS WITH NO OBSERVABLE EFFECT IN 7 DAYS — unclassified
+`WALL_ANCHOR_DRYRUN_ENABLED`, `TREND_REVERSAL_EXIT_DRYRUN`, `DXY_HALT_DRYRUN`,
+`FILTER_ENFORCEMENT_DRYRUN` are all `True` and produce **zero journal output in seven days**. They
+may be correctly dormant or they may be a second EQH/EQL (§2.6). **Not traced to a proof either
+way** — a bounded follow-up, not a claim.
+
+Two empty tables ARE now explained and are **not** defects:
+`breakeven_jobs` and `mfe_tracking` are **live-path only** (§1). `liquidity_sweep_state` being empty
+is a **second independent proof of §2.6** — its only writer sits inside the handler that never runs.
+
+
 ---
 
 ## 3. WATCH-LIST — CURRENT REALITY
@@ -199,9 +279,13 @@ running; switching them off silently degrades every exit consultation:**
 `orderbook-density collector` (60s, builds the percentile baseline `_exit_pct()` reads) ·
 `smart-exit dryrun sampler` (live regime + volume in the exit context)
 
+🔴 **CORRECTED 2026-07-29 — two of these are NOT accumulating, see §2.15:**
+`chop-short` **0 of 5, 0 arrivals since the FLAT floor** · `regime-FLAT high-ADX` **5 of 12 with a
+ZERO arrival rate and a rolling window that will take it back DOWN**
+
 **Genuinely accumulating toward a decision:**
-`volfloor` **4 SHORT / 4 LONG clean** (threshold 6; expiry §2.5) ·
-`exit advisor` **1 of ~10 closed positions** (§2.4)
+`volfloor` **5 SHORT / 4 LONG clean** (threshold 6; expiry §2.5) ·
+`exit advisor` **2 of ~10 closed positions** (§2.4)
 
 ---
 
@@ -262,7 +346,7 @@ price have done", **fetch candles**.
 
 ---
 
-## 6. SHIPPED TODAY — seven commits, `6c35b9d..f0a8d30`
+## 6. SHIPPED 2026-07-26 → 07-29 — twelve commits, `6c35b9d..4fc89ea`
 
 | Commit | What it fixed |
 |---|---|
@@ -274,19 +358,28 @@ price have done", **fetch candles**.
 | `d12e276` | Retire 3 sensors, redefine 2 |
 | `f0a8d30` | Give the entry advisor the **1H signal identity** (fact, not judgement) |
 
-Six distinct changes; `596fbdf` and `b878535` are two commits on one decision that reversed itself
-within the session — recorded that way on purpose.
+| `8b15ecc` | **2026-07-29** — order-book PERCENTILE scale for the ENTRY advisor; the word "Massive" deleted; the HARD RULE now judges thickness by percentile |
+| `7285c5d` | **2026-07-29** — all THREE tiers to both advisors with name/direction/weight/age + an explicit agreement line; `ABSENT` replaces `n/a`; new `entry_tiers_json` column; the false "3 timeframes are aligned" sentence removed |
+| `4fc89ea` | **2026-07-29** — EXIT prompt's "Total depth" line populated (had rendered `n/a` on 100% of consultations) |
+
+`596fbdf` and `b878535` are two commits on one decision that reversed itself within a session —
+recorded that way on purpose.
+
+⚠️ **Not yet verified by a real executed entry:** `7285c5d`'s `entry_tiers_json` WRITE path. The
+rendering is verified live; the persistence is exercised only when an entry executes, and none has
+since 2026-07-29 11:36. If it fails, the exit advisor falls back to the legacy block — it cannot
+break a trade.
 
 ---
 
-## 7. VERIFIED STATE AT CLOSE — 2026-07-27 01:00 UTC
+## 7. VERIFIED STATE AT CLOSE — 2026-07-29 12:45 UTC
 
-`git status` **clean** · origin **in sync** · HEAD **`f0a8d30`** · `titan.service` **active**
-(restarted 00:13:32) · `nginx -t` **successful**, `noquery` format live · **Mercury-SOL untouched
+`git status` **clean** · origin **in sync** · HEAD **`4fc89ea`** · `titan.service` **active**
+(restarted 2026-07-29 12:31:27, 0 errors since) · `nginx -t` **successful**, `noquery` format live · **Mercury-SOL untouched
 and active**
 
 **Flags live:** `LONG_PARTIAL_ENABLED=True` (1.0R, 1/3) · `EXIT_ADVISOR_PAPER_ENABLED=True`
-`DRYRUN=True` `ON_15M_CONFIRM=True` `HOURLY=True` (3600s) · `CONFLUENCE_FLAT_THRESHOLD=5.0` ·
+`DRYRUN=True` `ON_15M_CONFIRM=True` `HOURLY=True` (3600s) · `CONFLUENCE_FLAT_THRESHOLD=5.0` · `HTF_TOLERATE_NEUTRAL=True` (⚠️ omitted from this list until 2026-07-29 — it is why an ABSENT tier passes the cascade) ·
 `WALL_TRAIL_LIVE_ENABLED=False` · `AI_ADVISOR_HIDE_1H=True` · `ADX_BELOW_FLOOR=20.0` ·
 🔴 `LIVE_TRADING_ENABLED=False` · ⚠️ `EQH_EQL_SMART_TP_ENABLED=True` **(unreachable — see §2.6)**
 
@@ -294,7 +387,8 @@ and active**
 `17 8` bull-regime · `29 8` chop-short · `35 8` volfloor · `53 8` regime-FLAT high-ADX ·
 `11 8 * * 1` daily-trend-cohort (weekly)
 
-**Book:** 0 open positions. Last close vpos 82 LONG **+53.79** (trail, partial +18.91).
+**Book:** 1 open position — vpos 84 LONG @ 63,997.3, stop 63,129.9 (original), partial not fired.
+Last close vpos 83 SHORT **−143.67** (stop).
 
 ---
 
