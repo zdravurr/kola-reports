@@ -6,9 +6,9 @@
 Titan is a **BTC swing paper-trading bot**. `LIVE_TRADING_ENABLED = False`. All P&L below is paper
 P&L from the `virtual_positions` table.
 
-_Last updated: **2026-07-29 12:45 UTC** — §2.3 closed (`8b15ecc`), §2.11 closed (`4fc89ea`),
-§2.8/§2.9/§2.10 added (`7285c5d`), §1 CORRECTED and §2.12–§2.15 opened after the full loose-ends
-sweep. HEAD **`4fc89ea`**._
+_Last updated: **2026-07-29 13:35 UTC** — §2.3 closed (`8b15ecc`), §2.11 closed (`4fc89ea`),
+§2.8/§2.9/§2.10 added (`7285c5d`), §1 CORRECTED and §2.12–§2.17 opened after the full loose-ends
+sweep. §2.12 and §2.13 CLOSED by `c307bb7`. HEAD **`c307bb7`**._
 
 ---
 
@@ -101,7 +101,10 @@ Written down **deliberately in advance** so the bar cannot be moved after seeing
 > beats the actual exit **both in total USDT and in positions improved**.
 > **No partial credit. No re-cutting the sample. First verdict only** — not its best verdict.
 
-**Progress: 2 of ~10 closed** (vpos 82, vpos 83). **59 consults** recorded. vpos 82: no `close`
+🔴 **Progress: 0 of ~10 — RESTARTED at `c307bb7`, 2026-07-29 13:21 UTC (see §2.18).**
+The pre-fix count was 2 of ~10 (vpos 82, vpos 83); both are contaminated and are no longer counted.
+
+Historical record of the discarded pair: **59 consults** recorded. vpos 82: no `close`
 verdict ever issued (actual +53.79 kept). vpos 83: first `close` at 2026-07-28 04:00:51 would have
 been **+23.61 gross vs the actual −135.80** — an improvement of ~159 USDT. Running tally: **improved
 1, worsened 0, neutral 1.** Eight more closes needed; the bar does not move.
@@ -200,18 +203,25 @@ tier shows as `NEUTRAL` instead of reading as live. **A proper fix needs a separ
 in `state_machine`, written only when a NEW signal arrives and preserved across resets — a
 cascade-state change, out of scope, deliberately not done.** Recorded here so it is not rediscovered.
 
-### 2.12 🔴 EXIT PROMPT PROMISES A TRAIL THAT DOES NOT EXIST — 56 of 59 consultations
+### 2.12 ✅ CLOSED 2026-07-29 (`c307bb7`) — the exit prompt's false trail promise
 The close prompt ends with *"The stop and trail remain active if you HOLD."* **The trail arms at
 +1R.** Of the 59 exit consultations ever made, **56 (94.9%) happened with MFE below 1.0R**, i.e. no
 trail existed at all. The sentence asserts a protection that is not there, **in the direction that
 makes holding look safer than it is.**
 
-Exactly the class of *"The 3 timeframes are aligned"* (closed by `7285c5d`), at a higher rate, and
-**still live**. NOT fixed on 2026-07-29 because rewording an exit-side instruction changes advisor
-behaviour and that is an operator decision, not a plumbing fix.
-**This is the highest-value remaining item on Titan.**
+Replaced with a block computed **per consultation** from the position's own management state
+(`breakeven_applied`, read not inferred): ARMED / NOT ARMED / unreadable, the live stop and its
+distance in R, and — when not armed — the exact price that would arm it. Facts only.
 
-### 2.13 🔴 THE ADX "~<20-23 = weak/ranging" LABEL IS A HARD-CODED CONSTANT WITH NO REVIEW DATE
+Live proof, row 19460, 2026-07-29 13:30:08, trigger `armed_exit`:
+> *If you HOLD: the stop-loss is in place. The trailing stop is NOT ARMED — it arms only at +1R,
+> which this position has not reached, so the stop is the only protection. It would arm if price
+> reaches 64864.7 (+1R). Current stop: 63129.9 (+1.19R away).*
+
+The dormant legacy `_CLOSE_SYSTEM` carried the same falsehood and was corrected to a true statement
+in the same commit. **See §2.18 for the contamination this created in the §2.4 sample.**
+
+### 2.13 ✅ CLOSED 2026-07-29 (`c307bb7`) — the ADX "~<20-23" claim and the rule built on it
 It appears twice: as a label in the volatility block (`claude_advisor.py:334`) and **inside the
 FLAT-MARKET GUARD soft rule** in `_ENTRY_SYSTEM`. A textbook ADX cut-off, asserted to the model as
 fact, never validated on this book — and **contradicted by our own measurement**: the 2026-07-29
@@ -220,7 +230,13 @@ regime study found that on skipped signals ADX 25–30 drifts **−0.34%/24h** w
 
 Same class as "Massive" (§2.3) and the same failure mode that forced the counter-short caution's
 retirement (§4.5): a number nobody re-checked — except this one was never checked at all.
-**Either validate it or retire it. Leaving it is how the last one happened.**
+
+**RETIRED.** The label and the entire FLAT-MARKET GUARD soft rule are removed.
+🔴 **DELIBERATELY NOT REPLACED WITH ANOTHER NUMBER** — we have no validated one, and a second
+unvalidated threshold would repeat the defect with a new value. The advisor still sees every ADX,
+ATR% and EMA-gap figure, raw, on every timeframe; it is no longer told what they mean.
+`ADX_BELOW_FLOOR`, the post-entry recheck, the score gate and the cascade are untouched — this was
+prompt text only. **Do not reintroduce a threshold without a study and a review date.**
 
 ### 2.14 `Long/Short ratio` has NO PRODUCER — 100% of entry prompts say `n/a`
 `mc_ls_ratio` is NULL on **all 18,505** `trades` rows. Three references exist in the entire
@@ -250,15 +266,58 @@ forever looking like progress.** Not done today — retiring a sensor is an oper
 | `skip_drift_samples` / `skip_attribution` | 38,480 / 7,696 | used ad hoc; no standing plan |
 | `post_exit_drift_samples` / `post_exit_observatory` | 185 / 38 | **no plan recorded at all** |
 
-### 2.17 FLAGS WITH NO OBSERVABLE EFFECT IN 7 DAYS — unclassified
-`WALL_ANCHOR_DRYRUN_ENABLED`, `TREND_REVERSAL_EXIT_DRYRUN`, `DXY_HALT_DRYRUN`,
-`FILTER_ENFORCEMENT_DRYRUN` are all `True` and produce **zero journal output in seven days**. They
-may be correctly dormant or they may be a second EQH/EQL (§2.6). **Not traced to a proof either
-way** — a bounded follow-up, not a claim.
+### 2.17 ✅ FOUR SILENT DRYRUN FLAGS — TRACED AND CLEARED (not a defect)
+`WALL_ANCHOR_DRYRUN_ENABLED`, `TREND_REVERSAL_EXIT_DRYRUN`, `DXY_HALT_DRYRUN` and
+`FILTER_ENFORCEMENT_DRYRUN` are all `True` and produced **zero journal output in seven days**, which
+looks exactly like the EQH/EQL signature (§2.6). **They are not the same thing.** Each was traced to
+its consumer and each is REACHABLE code inside a **condition-gated** branch:
 
-Two empty tables ARE now explained and are **not** defects:
+| flag | consumer | why it is silent |
+|---|---|---|
+| `WALL_ANCHOR_DRYRUN_ENABLED` | `virtual_trader.py:1424` | prints only when `wall_route == 'wall'` — i.e. only when a qualifying wall would actually anchor the stop |
+| `TREND_REVERSAL_EXIT_DRYRUN` | `main.py:3142` | inside the reversal-exit branch; needs a signal in `CONFIRMED_REVERSAL_IDS` |
+| `DXY_HALT_DRYRUN` | `risk_manager.py:228` | inside the DXY-halt branch; fires only when DXY would block |
+| `FILTER_ENFORCEMENT_DRYRUN` | `main.py` | fires only on a filter match |
+
+**Silence here means the condition has not occurred, not that the code is dead.** Recorded so the
+next sweep does not re-raise it. Contrast §2.6, where the gate condition is *structurally* False on
+every fire.
+
+Two empty tables are likewise **explained and not defects**:
+
 `breakeven_jobs` and `mfe_tracking` are **live-path only** (§1). `liquidity_sweep_state` being empty
 is a **second independent proof of §2.6** — its only writer sits inside the handler that never runs.
+
+
+### 2.18 🔴 THE PRE-`c307bb7` EXIT VERDICTS ARE CONTAMINATED — §2.4's COUNT RESTARTS
+**All 59 exit consultations recorded before `c307bb7` were produced under a false statement**, and
+**56 of them (94.9%) carried it in the form that mattered**: the prompt asserted *"The stop and trail
+remain active if you HOLD"* while the trail was not armed, i.e. it promised a protection that did not
+exist. The bias has a **known direction — toward HOLD.**
+
+**DECISION: the §2.4 activation criterion restarts its count from `c307bb7` (2026-07-29 13:21 UTC).
+Progress resets from 2 of ~10 to 0 of ~10.** Reasoning, and the honest caveat:
+
+- The criterion was written down **in advance specifically so the bar could not be moved after seeing
+  results**. A sample generated under a known, directional bias is exactly what that discipline
+  exists to exclude. Keeping it would mean the first thing we ever did with an un-gameable criterion
+  was to accept evidence we know was skewed.
+- Both closed datapoints are affected. vpos 82 received **no** `close` verdict at all — precisely the
+  outcome a hold-bias produces. vpos 83's first `close` came at 04:00:51 while the position was
+  below +1R, i.e. under the false promise throughout.
+- **The caveat, stated because it cuts against the decision:** discarding vpos 83 throws away the
+  datapoint that FAVOURED the advisor (+23.61 vs the actual −135.80, ~+159 USDT). Restarting is
+  therefore **conservative against the advisor**, not for it. It also means a truthful prompt might
+  plausibly have produced an EARLIER close on vpos 83 — better still — so the bias may have been
+  costing the advisor credit rather than lending it. That is speculation; the direction of the bias
+  is knowable, its effect on any single verdict is not, and a criterion this deliberate should not
+  rest on a guess either way.
+
+**I agree with the operator's view. Restart the count.** The 59 pre-fix consults keep their value as
+a record of what the advisor said and why — they are simply not admissible evidence for the
+go-live decision.
+
+**Do not re-cut this sample later to reach ~10 sooner.** That is the same move the criterion forbids.
 
 
 ---
@@ -285,7 +344,7 @@ ZERO arrival rate and a rolling window that will take it back DOWN**
 
 **Genuinely accumulating toward a decision:**
 `volfloor` **5 SHORT / 4 LONG clean** (threshold 6; expiry §2.5) ·
-`exit advisor` **2 of ~10 closed positions** (§2.4)
+`exit advisor` **0 of ~10 closed positions — count RESTARTED at `c307bb7`** (§2.4, §2.18)
 
 ---
 
@@ -346,7 +405,7 @@ price have done", **fetch candles**.
 
 ---
 
-## 6. SHIPPED 2026-07-26 → 07-29 — twelve commits, `6c35b9d..4fc89ea`
+## 6. SHIPPED 2026-07-26 → 07-29 — thirteen commits, `6c35b9d..c307bb7`
 
 | Commit | What it fixed |
 |---|---|
@@ -361,6 +420,7 @@ price have done", **fetch candles**.
 | `8b15ecc` | **2026-07-29** — order-book PERCENTILE scale for the ENTRY advisor; the word "Massive" deleted; the HARD RULE now judges thickness by percentile |
 | `7285c5d` | **2026-07-29** — all THREE tiers to both advisors with name/direction/weight/age + an explicit agreement line; `ABSENT` replaces `n/a`; new `entry_tiers_json` column; the false "3 timeframes are aligned" sentence removed |
 | `4fc89ea` | **2026-07-29** — EXIT prompt's "Total depth" line populated (had rendered `n/a` on 100% of consultations) |
+| `c307bb7` | **2026-07-29** — two prompt claims replaced by facts: the false trail promise (§2.12) and the ADX "~<20-23" threshold plus the FLAT-MARKET GUARD rule built on it (§2.13) |
 
 `596fbdf` and `b878535` are two commits on one decision that reversed itself within a session —
 recorded that way on purpose.
@@ -372,10 +432,10 @@ break a trade.
 
 ---
 
-## 7. VERIFIED STATE AT CLOSE — 2026-07-29 12:45 UTC
+## 7. VERIFIED STATE AT CLOSE — 2026-07-29 13:35 UTC
 
-`git status` **clean** · origin **in sync** · HEAD **`4fc89ea`** · `titan.service` **active**
-(restarted 2026-07-29 12:31:27, 0 errors since) · `nginx -t` **successful**, `noquery` format live · **Mercury-SOL untouched
+`git status` **clean** · origin **in sync** · HEAD **`c307bb7`** · `titan.service` **active**
+(restarted 2026-07-29 13:21:47, 0 errors since) · `nginx -t` **successful**, `noquery` format live · **Mercury-SOL untouched
 and active**
 
 **Flags live:** `LONG_PARTIAL_ENABLED=True` (1.0R, 1/3) · `EXIT_ADVISOR_PAPER_ENABLED=True`
