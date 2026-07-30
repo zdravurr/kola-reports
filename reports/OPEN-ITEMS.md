@@ -940,8 +940,9 @@ Fourth, fifth and sixth instances of *"check not only what the gate DECIDES, but
   reads. The 1h then was **11.1, below the FLAT floor of 20**; the recheck scored that same value −5
   eleven seconds later. Now prints `ADX 5m: 25.87 | 1h: 11.12 ← the gates read this`.
 
-### 2.23 🔴🔴 THE ADVISOR'S OFF-SWITCH ALSO SILENCES IT — `DRYRUN=False` WOULD HAVE MADE IT MUTE, NOT ACTIVE
-**Found 2026-07-30 11:05 while preparing exactly the one-line flip this item now forbids.**
+### 2.23 ✅ THE ADVISOR'S OFF-SWITCH ALSO SILENCED IT — FIXED `81875c9` (2026-07-30 11:32, LIVE)
+**Found 2026-07-30 11:05 while preparing exactly the one-line flip this item forbade.**
+**Approved and shipped 11:32 — the advisor is now ARMED. `EXIT_ADVISOR_DRYRUN = False`.**
 `EXIT_ADVISOR_DRYRUN` reads as "record the verdict, do not act on it". It is **two switches wearing
 one name**, and the second one is wired backwards.
 
@@ -991,10 +992,45 @@ inverse and it is worse: the flag says the right thing and DOES a second, unname
 read **only** where a verdict is acted on. The log prefix `[EXIT-ADVISOR-DRYRUN]` becomes
 `[EXIT-ADVISOR-LIVE]` when it can act, so the journal cannot claim DRYRUN next to a real close.
 
-**Known label debt, recorded rather than fixed:** the DB status stays `exit_ai_dryrun` even when
-acting. Renaming it would fork the 77-row audit trail that §2.4 is cut from. Acted-on verdicts are
-identifiable by `virtual_positions.close_reason='ai_exit'`; the status column is the verdict channel,
-not a claim about acting. **Revisit if a second consumer ever reads that string as "did not act".**
+**LABEL DEBT — A DELIBERATE CHOICE, NOT AN OVERSIGHT. Operator-approved 2026-07-30 11:28.**
+The verdict row's `trades.status` stays **`exit_ai_dryrun`** even when the advisor acts, and the
+string is now inaccurate on purpose. **The reason: renaming it forks the 77-row audit trail that
+§2.4 is cut from** — every historical verdict carries that status, and a rename would split the
+criterion's own sample across two labels for a cosmetic gain.
+
+**Read it as the name of the CHANNEL, not as a claim about what happened.** It means *"a row on the
+exit-advisor verdict channel"*. Whether that verdict was ACTED on is a different fact, recorded in a
+different place: **`virtual_positions.close_reason='ai_exit'`**, which is the separable field and the
+one every future cut should use.
+
+🔴 **The next reader must not treat this as a lie, and must not "fix" it casually.** If a second
+consumer is ever written that reads `exit_ai_dryrun` as *"the advisor did not act"*, that consumer
+is wrong and this note is the reason why — fix the consumer, or migrate all 77 rows at once and
+update §2.4's query in the same commit. **Do not rename it for one new query.**
+
+### 2.24 ✅ THE THREE THINGS CONFIRMED IN THE SAME APPLY (operator's conditions, `81875c9`)
+1. **`_emergency_close` is NOT collateral.** It calls
+   `main._execute_close_position(symbol, position_side, _from_adapter=True)` — untouched by the
+   reorder, which moved a block *inside* that function. It still reaches the RAW mechanics via
+   `_from_adapter=True` (mandatory: it fires before the `virtual_positions` row exists, so
+   engine-routing would find no row and return `None`, leaving a real position open with no stop).
+   **Under the new ordering its behaviour is identical**: it fires precisely when the stop FAILED to
+   place, so the cancel loop has nothing to cancel and is a no-op under *either* ordering. In the
+   sub-case where a stale order does exist, the new ordering is strictly better — the close now
+   happens before any cancel.
+2. **The fetch guard is still FIRST.** Proven by position in the shipped function:
+   `_fetch_open_position` line 39 → `return None` line 41 → `create_market_order` line 63 →
+   `fetch_order_fee` line 69 → cancel loop line 78/87 → `_cancel_stop_orders` line 95. **A position
+   that closed between ticks is returned as `None` and never traded against.**
+3. **5m Group B was REPOINTED, not disabled** — operator's choice of the two offered. It now asks
+   the engine for its own row (`virtual_trader._open_position`) and calls `consult_exit_advisor`,
+   the same enriched prompt as the hourly and 15m triggers. The unenriched `consult_for_close`
+   survives only for the case it was always right for: **no engine row exists at all.** Its close
+   also now stamps **`ai_exit`** instead of `external` — `_execute_close_position` gained an explicit
+   `reason` parameter defaulting to `'external'`, so **no existing caller changes stamp.**
+   *Rationale for repointing over disabling:* a dormant path is not a dead one, and the failure mode
+   of leaving it was a close-capable trigger judging on a weaker prompt than the sample the
+   criterion is built from — which is precisely how this session's defects were seeded.
 
 ## 3. WATCH-LIST — CURRENT REALITY
 
@@ -1079,7 +1115,9 @@ price have done", **fetch candles**.
 
 ---
 
-## 6. SHIPPED 2026-07-26 → 07-30 — **twenty-four commits, `93c20c3..957f980`**
+## 6. SHIPPED 2026-07-26 → 07-30 — **twenty-five commits, `93c20c3..81875c9`**
+
+🔴 **`81875c9` (2026-07-30 11:32) — THE EXIT ADVISOR CAN ACT.** `EXIT_ADVISOR_DRYRUN=False`, both consult gates freed from the flag that also muted them (§2.23), `_advisor_close` added as the only advisor-driven close, `close_reason='ai_exit'`, **close-first/cancel-after in the shared close path** (removes a naked-position window latent on sl / trail / armed / emergency), 5m Group B repointed to the enriched prompt (§2.24). 186 insertions, 35 deletions, 3 files.
 
 **2026-07-29 evening → 07-30 (post-`cb3a8bb`), six commits:** `11055e2` revert to paper ·
 `97a4fdb` naked-position defect + its class + the race neither cap caught · `4ce8664` LIVE again ·
@@ -1182,7 +1220,7 @@ rather than a flat book (previously `0 exchange position(s), 0 open row(s)`).
 | `PAPER_FIXED_MARGIN_USDT` | 2000.0 ($10,000 notional — historical book) |
 | `LIVE_FIXED_MARGIN_USDT` | **30.0** ($150 notional) |
 | `FIXED_MARGIN_USDT` | 2000.0 — **dead in live**, reachable only from the unreachable legacy path |
-| `EXIT_ADVISOR_DRYRUN` | **True — the advisor CANNOT close a position.** Patch to `False` PREPARED, **NOT APPLIED**, awaiting approval — and it is **not** a one-line flip, see §2.23 |
+| 🔴 `EXIT_ADVISOR_DRYRUN` | **False since `81875c9`, 2026-07-30 11:32 — THE ADVISOR CAN NOW CLOSE A POSITION.** It was never a one-line flip; see §2.23 / §2.24 |
 | `EXIT_ADVISOR_HOURLY` | True |
 | `WALL_TRAIL_LIVE_ENABLED` | False |
 | `MAX_POSITIONS_PER_SIDE` | 1 |
