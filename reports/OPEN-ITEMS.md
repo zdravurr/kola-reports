@@ -1808,7 +1808,21 @@ Full reports go to the **`kola-reports` repo**; the secret/PII scan is **fail-cl
 push** because the repo is public; Telegram gets a short decision summary **plus the single dated
 raw link**, not the report body.
 
-Durable memory: `feedback_dated_snapshot_never_reused_urls`.
+### 🔴 8a. EVERY CHECK GETS A DATED FILE AND A LINK — operator, 2026-07-30, SECOND OCCURRENCE
+**A result that exists only in the terminal DID NOT HAPPEN.** §8 above already said this; it was read
+as applying to *reports* rather than to *checks*, and that reading is now closed.
+
+- **EVERY check gets a NEW dated file and a delivered raw link. However small. Including one-line
+  answers. Including "nothing has changed yet" and "not due for another 40 minutes".**
+- **§8 is NOT "when asked". The report IS the deliverable.**
+- **If a check is too small to write up, write it up in THREE LINES — but write it up.**
+
+**Both violations on the day it became a rule, recorded rather than smoothed over:** a query answering
+*"did the post-fix sampler row land"* delivered in the terminal only, and a pending-item follow-up
+held back for "when the monitor fires" instead of delivered on the check that had already run.
+**Two occurrences is what makes it a rule instead of a lapse.**
+
+Durable memory: `feedback_dated_snapshot_never_reused_urls`, `feedback_every_check_gets_a_link`.
 
 ---
 
