@@ -1032,6 +1032,200 @@ update §2.4's query in the same commit. **Do not rename it for one new query.**
    of leaving it was a close-capable trigger judging on a weaker prompt than the sample the
    criterion is built from — which is precisely how this session's defects were seeded.
 
+### 2.25 ✅ THE STOP FIRED — §7 UNCERTAINTY 1 CLOSED, no revert condition met (2026-07-30 11:50:47.9)
+vpos 86's `closePosition='true'` `STOP_MARKET` triggered for the FIRST time in this bot's history.
+Verified from the venue on both probes: **SHORT exactly ZERO** (no residual, no reversal), **exactly
+ONE `closePosition` order on the symbol**, **zero orphans** of any type, and the stop filled the
+**WHOLE 0.0023** in one child order (`avgPrice 64733.0`, `commission 0.074443`, `profit −2.4081`).
+Row finalised by the **PASSIVE** path (item 13, first real firing, ~1.1 s detect-to-reconcile) from
+the REAL order — price and fee **read back**, not estimated (`[BE-FILL] … ESTIMATED` absent). §1a's
+revert conditions stay on the page and were NOT triggered. `reason='sl'` decided from the row's own
+`breakeven_applied=false`. §7 uncertainty 3 → **n=4, 0 failures** (a rate still cannot be estimated).
+
+🔴 **Three residuals, stated rather than closed with the item:**
+1. **`fetch_order(<trigger id>)` returns a DIFFERENT order id** — the child execution, with
+   `triggerOrderId` back-pointing. Reconciliation depends on BingX resolving trigger→child. If it ever
+   returned the trigger object instead (no `avgPrice`), `read_filled_protective_order` falls through
+   to `fetch_ticker(...)['last']` and books an **invented** exit price. No guard exists.
+2. **The passive path runs NO orphan sweep** — `_reconcile_passive_fill → _do_close` never reaches
+   `_execute_close_position`, so neither the cancel loop nor `_cancel_stop_orders` runs. Harmless in
+   *this* configuration (the stop was the only order); a TP or DCA limit would be left behind.
+3. **The 34-point favourable gap is NOT systematic.** Trigger 64767.1 on MARK, fill 64733.0 on BingX's
+   book. Measured basis over **1,000 paired 1m mark/last candles**: mean +0.41, **median 0.00**, sd
+   3.02, and max **+6.1** on the 20 high-volatility minutes. The 34 pts is a transient inside a
+   **+175 pt / 60 s, 198 BTC** spike; **the sign is not guaranteed** (a BingX-led move triggers LATE
+   and fills WORSE). **Do not conflate with §1's "+36.91 over 101,739 candles"** — different
+   mechanism. BingX's finest kline is 1m and the event lasted 926 ms, so which side led is
+   unobservable after the fact. **Cheap fix, NOT built:** log
+   `(trigger_price, fill_price, mark_at_fill, last_at_fill)` on every stop fire.
+
+### 2.26 🔴🔴 ONE ADX, TWO WINDOWS — AND THE DIFFERENCE IS RENDERED AS A CHANGE (§2.19's class, 4th place)
+**The entry path computes ADX on 200 candles; the post-entry recheck and the exit-advisor sampler
+compute it on `ATR_LEN * 3 = 42`.** ADX(14) is DOUBLY Wilder-smoothed, so 42 bars has not warmed up.
+
+| path | fetch | value, same instant |
+|---|---|---|
+| entry snapshot | `indicators._fetch_ohlcv_cached(..., CANDLE_LIMIT=200)` | **13.83** (converged; 300 bars = 13.834) |
+| **recheck** `virtual_trader.py:1541` | `fetch_ohlcv('1h', limit=ATR_LEN*3)` = 42 | **25.64** |
+| **exit sampler** `virtual_trader.py:1805` `_tf_metrics_safe` | same 42 | same |
+
+**Live tell — vpos 87, 13 seconds apart:** `virtual_positions.entry_adx_1h = 13.5163` vs
+`recheck_events` id 37 `adx_1h = 25.3505`.
+
+**Scope is TIGHT and was checked, not assumed — it is ADX and ONLY ADX.** Same two windows: ATR 1h
+314.4 vs 317.4 (−0.9%), `trend` identical, `ema_gap` 0.3551 vs 0.3548. ADX 1h **+44%**, ADX 15m
+**+4.3 pts**. The comment at `virtual_trader.py:683` — *"Wilder is window-sensitive, so faithful
+alignment needs the same limit"* — is right, was written for ATR, and is **violated for ADX**.
+
+**Magnitude, 800 paired readings over 1,000 real 1h candles:**
+```
+ADX42 − ADX200 : mean +6.23  median +5.38  sd 10.04  min −22.29  max +52.16
+  |diff|>5 : 484 (60.5%)   |diff|>10 : 285 (35.6%)   ADX42 > ADX200 in 593/800 (74.1%)
+ADX_BELOW_FLOOR = 20 :  truly <20 (200-bar) 221 of 800
+  MISSED (true<20, 42-bar>=20) : 117  ->  52.9% of every true-below-floor state
+  FALSE  (true>=20, 42-bar<20) :  56          agreement rate 78.4%
+```
+🔴 **`ADX_BELOW_FLOOR` misses more than half the states it exists to catch** — and it is worth −5 with
+`HEALTH_SCORE_TIGHTEN = −5`, so that rule ALONE decides TIGHTEN. Its companion `adx_drop` computes
+`entry_adx (200-bar) − cur_adx (42-bar)`, so a systematically-high `cur_adx` makes the difference
+systematically negative: **both ADX rules in the recheck are biased toward "healthy".**
+
+🔴 **It reaches the exit advisor as a fabricated trend.** vpos 87's stored exit prompt, verbatim:
+```
+Regime at ENTRY vs NOW
+  At entry: regime=TREND 1d=neutral 4h=bull 1h=bull ADX1h=13.5     <- 200-bar
+  Now:      15m=bull 5m=bull ADX1h=25.4 ADX15m=46.8                <- 42-bar
+```
+The prompt asserts an **11.9-point rise across 25 seconds that did not occur**, under a heading saying
+the two are comparable — and the advisor read it that way: *"Regime strengthened."* vpos 86's row
+19590 (*"bearish regime (ADX rising to 14.9)"* against an entry of 11.1) is the same artefact.
+
+**Why §2.19's guard could not catch it:** `_exit_pct(col, value, source)` makes **book** provenance
+mandatory. Nothing makes **indicator-window** provenance mandatory. All **228+**
+`smart_exit_dryrun_samples` rows carry 42-bar ADX, so §2.16's chop-exit re-cut would run on biased data.
+
+**Shape of the fix, NOT applied (read-only session, awaiting the operator):** one window per
+indicator — route both paths through `_fetch_ohlcv_cached(..., CANDLE_LIMIT)` — plus a provenance
+guard of the §2.19 shape so a window cannot be borrowed silently. **Consequence for the live
+position:** vpos 87's true ADX1h is 13.5, under the floor; on the entry window all three recheck tiers
+would have scored **−5 → TIGHTEN**. The three `Health 0 / verdict OK` readings are artefacts — **and
+that is also why §2.20's no-op-TIGHTEN fix is still UNEXERCISED in live** (11 of 14 positions with
+recheck rows already ran all three tiers; only vpos 74 and 86 ever stopped at T+10, both on a TIGHTEN).
+
+### 2.27 🔴 §2.4 IS CONTAMINATED A SECOND TIME — and vpos 86 produced NINE clean-book `close` verdicts
+Contrary to the 11:39 prediction that vpos 86 would contribute zero, it produced **nine `close`
+verdicts after the `625fedc` deploy at 02:51:11**, every one on a corrected book block, and **every
+one beat the actual exit**:
+
+| row | UTC | px at nearest sample | net if closed | R |
+|---|---|---:|---:|---:|
+| **19607** | **03:50:29** | 64191.30 | **−1.3092** | **−0.527** |
+| 19628 | 06:50:53 | 63961.00 | −0.7793 | −0.313 (best) |
+| 19678 | 10:51:14 | 64569.20 | −2.1789 | −0.876 (worst) |
+| — | **11:50:48 ACTUAL** | **64733.00** | **−2.541574** | **−1.02213** |
+
+(the other six: 19617 −0.405 · 19624 −0.385 · 19633 −0.322 · 19646 −0.636 · 19649 −0.616 · 19660 −0.858)
+
+🔴 **NOT counted, and the reason is the discipline, not the number.** The criterion says *first*
+`close` verdict, *no re-cutting*. vpos 86's first was **01:50:24 — contaminated**. Calling 03:50:29
+"the first" is the exact re-cut the criterion forbids. **Both readings, arithmetic done, operator
+decides by rule:** STRICT → vpos 86 does not count, §2.4 stays **0 of ~10**. LENIENT → **IMPROVED
++$1.2324 = +0.495R**, §2.4 → 1 of ~10.
+**And a new reason to prefer STRICT that has nothing to do with the book: all nine prompts carried
+42-bar ADX (§2.26).** A third restart is a decision, not proposed here.
+**The operational fact, separate from the criterion:** the advisor said `close` **twelve times over
+nine hours**, was mute for eleven of them by `DRYRUN`, was armed at 11:32:45 — and the stop beat its
+next turn (`exit_advisor_last_ts` 10:51:11 + 3600 = **11:51:11**) by **23.1 seconds**. Arming was
+correct and still bought zero datapoints.
+
+### 2.28 🔴 THE POST-EXIT OBSERVATORY HOLDS GHOST ROWS, and stamped a live outcome onto one
+`post_exit_observatory` id **79** says `vpos_id = 86`, but its entry data is **not** vpos 86's:
+
+| field | observatory 79 | `virtual_positions` 86 |
+|---|---|---|
+| entry_price | **63605.6** | **63686.0** |
+| original_sl_price | **64724.6** | **64767.1** |
+| opened_at | **2026-07-29T21:50:04** | **2026-07-30T00:50:14** |
+
+Three hours and 80.4 points apart — **two different positions.** `on_entry` upserts with
+`ON CONFLICT(vpos_id) DO NOTHING`, so the real vpos 86 wrote **nothing**; `on_real_close` then stamped
+today's outcome onto the stale row. The published `exit_advantage_r = +0.42525` therefore mixes a
+shadow leg priced off entry 63605.6 with a real leg from a position that entered at 63686.0. On vpos
+86's OWN numbers the advantage is **+0.4787R**. Sign survives here; the mechanism can flip one.
+
+Also: id **80** carries `vpos_id = 89` (SHORT, entry 63595.5, orig SL 64714.5, opened
+2026-07-29T21:50:11) while `virtual_positions` has **no row 88 or 89** and `sqlite_sequence` is at
+**87**; `recheck_events` / `position_excursion_samples` / `smart_exit_dryrun_samples` know only 86 and
+87. Both ghosts are stamped **2026-07-29 21:50**, inside the naked-position window. The §7 caveat
+*"the naked short has no `virtual_positions` row"* stays true — **but it DOES have a surviving record,
+with an entry price and a stop.** And row 80 is **still live** (`updated_at 2026-07-30T02:00:14`): the
+02:00 15m signal armed a shadow exit on it. **A phantom position is accumulating shadow data.**
+**Nothing touched** — `feedback_no_delete_virtual_positions` is standing and this is a data decision.
+
+### 2.29 🔴 `weighted_adj`'s OWN DOCSTRING IS HALF FALSE — the adjusted score is not stored either
+`weight_engine.py`: *"Gate policy: `weighted_adj()` is NEVER applied to the raw `direction_score` that
+gates entry. **Only the stored `confluence_score` uses it.**"* The first half is true. The second is
+not: `adj_score` reaches a `print`, the Telegram card, and a `confluence_score=` update kwarg — and
+then **`signal_matrix.snapshot()` at `main.py:3996` overwrites the column with `res['score']`**, the
+RAW matrix score. Proof: vpos 87's journal reads `raw=4.25 adj=-0.6212 final=3.63` while
+`trades.19713.confluence_score = 4.25`.
+**So `_w_adj` gates nothing AND is persisted nowhere.** The only score adjustment that reaches the
+gate is `macro_filter`'s `total_gate_adj` (0.0 on this entry). Two numbers are called "the adjusted
+score"; one is documented as stored and is in fact discarded. **Fifth instance of *check what the
+label SAYS, not only what the gate DECIDES*.** Display-only, no money at risk — recorded so the next
+reader does not cut a cohort on `confluence_score` believing it is the adjusted figure.
+
+### 2.30 🔴 TAPE PRESSURE — shown, weighted by nothing (§2.21's shape, 2nd place) + it mislabels its window
+`trades.tape_json` has exactly three consumers: `format_telegram_block` (the card),
+`_persist` (storage), and `compact_for_llm` → the **post-trade** attribution prompt. **It does not
+appear in the entry prompt at all**, and `capture_and_persist_sync` runs at `main.py:3997`, *after*
+the entry executed. `microstructure.py`'s docstring says it plainly: *"never gates a trade."*
+So vpos 87's card showed **Tape Pressure Sell 0.09** — an extreme reading — next to **book depth 82nd
+pct**, and **neither carries weight anywhere.**
+**And the number is weaker than it looks:** `window_seconds: 60` but `span_ms: 15168` — `_analyze_tape`
+filters `now_ms − ts <= window_ms` over whatever `fetch_trades` returned and never guarantees the
+window it names; and **one 11.3-BTC print is 733,715 of the 831,707 USDT sell side (88%)**, so
+`buy_share_window = 0.0949` is n=1 dressed as a ratio.
+Not entangled with book imbalance by construction (L3 aggression vs L2 resting depth) but not
+independent either — same snapshot, and on this entry they pointed **opposite** ways
+(`orderbook_json` band **bid**-heavy 0.6994 vs tape 91% **sell**).
+
+### 2.31 THE §4.4 MIRROR CASE DOES NOT EXIST AT USABLE n — and its sign is backwards where it does
+§4.4: 289 skips citing an ask wall above while SHORT drifted −0.270%/4h (t=−4.6) — the best vetoes in
+the book. The mirror — **LONGs taken THROUGH a notable ask wall** — parsed from every stored entry
+prompt (both formats) and percentiled against the same 24,658-snapshot `max_wall_mult_ask` baseline:
+
+| cohort | §0-CLEAN n | totR | ALL-closed n (⚠ breaks §0 filters 3+4) | totR |
+|---|---:|---:|---:|---:|
+| LONG · ask wall ≥ 77th pct | **1** | +1.04 | 5 | +0.27 |
+| LONG · ask wall ≥ 70th pct | **1** | +1.04 | 6 | **−0.01** |
+| LONG · ask wall < 50th pct | 4 | −2.27 | **14** | **−6.61** |
+
+**Clean n = 1** (vpos 82, ×11.7 = 85.9th pct, +1.04R on the trail). The widened cut shows **no harm at
+all** and, if anything, the inversion — thin ask walls did worse — which is contaminated by moved
+stops and two sizing eras and is **NOT offered as a finding.**
+**What IS solid is the structural asymmetry: 289 vetoes versus 6 contaminated entries. The advisor
+almost never takes a LONG into a notable ask wall**, so §4.4 and this table are a filter and its
+leakage, not two arms of an experiment. **Nothing here contradicts §4.4; nothing supports re-opening it.**
+Independent check that the entry-side percentile machinery is CORRECT: the baseline's 77th percentile
+of `max_wall_mult_ask` is **×8.38** and vpos 87's prompt rendered **×8.4 = 77th pct**. ✅
+⚠️ Still open from §2.22: **three divergent "imbalance" values under one word** at vpos 87's entry —
+0.42 (OKX-4000, prompt, **ask**-heavy, 5th pct) · 0.6994 (BingX ±1% band, `orderbook_json`, **bid**-heavy)
+· 0.5748 (BingX-100, `entry_ob_imbalance`). The misleading label was deleted; the divergence remains,
+and here two of them point in **opposite directions**.
+
+### 2.32 WATCH — the ADX1h base rate at entry, and the 5th-pct imbalance the advisor did not mention
+On executed entries since the forming-candle fix (23 rows, all with `srv_adx_1h`): **6 of 23 = 26.1%**
+entered with **ADX1h < 20**; median at entry **24.00**; only **2** entries ever had
+`market_regime='FLAT'`, the sole state where `CONFLUENCE_FLAT_THRESHOLD` binds. The last four
+executed entries read **30.7, 16.7, 11.1, 13.5** — **the two lowest readings in the whole history are
+the two most recent trades**, and 3 of the last 4 are sub-floor. Two-in-a-row is ~6.8% under
+independence, i.e. unremarkable; **the tail is the watch item, with n=2. Not a finding, do not act.**
+Outcome cut is under-powered both ways (ADX1h<20: n=2, −0.05R · ≥20: n=14, −4.87R).
+Separately, on vpos 87 the entry advisor cited depth (82nd pct) and the ask wall (77th pct) and was
+**silent on `Imbalance 0.42 ask-heavy — 5th pct`, the most extreme figure in the block and against the
+LONG.** A selective read of a correct prompt. Worth watching alongside §2.8 and §2.19's n=1 note.
+
 ## 3. WATCH-LIST — CURRENT REALITY
 
 **Retired** (deleted `d12e276` — they answered their question or their question died):
