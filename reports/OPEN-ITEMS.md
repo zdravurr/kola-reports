@@ -185,6 +185,41 @@ silently drops vpos 62. This exact bug produced a wrong answer once already.
 **Sign convention:** skip-drift `_compute_drift_pct` is **positive = the skipped signal would have
 won**. Reading it backwards inverts every veto conclusion. This caused a real inverted finding.
 
+### 🔴🔴 `trades.confluence_score` HOLDS THREE DIFFERENT QUANTITIES. NEVER COMPARE IT ACROSS STATUSES.
+
+**Found 2026-07-30 21:00 while building the score distribution. Documented in code at all seven
+write sites and at the schema declaration by commit `dee6cee`.** This is the **fifth** instance of "the label does not say what
+it means", and unlike the other four it silently corrupts *analysis* rather than behaviour.
+
+| exit branch | what lands in `confluence_score` | write site |
+|---|---|---|
+| `below_threshold` | `_gated_score` = **raw + `total_gate_adj`** — the number the gate actually compared | `main.py:3695,3700` (+ mirrors `:1903,1908`, `:4222,4227`) |
+| `risk_halt` | `direction_score` = **raw**, and `macro_gate_penalty` is left **NULL** | `main.py:3797` |
+| every downstream status (`ai_skipped`, `virt_cap_blocked`, `executed`, `failed`, `claude_unavailable`) | `adj_score` = **raw + weight-engine adjustment**, clipped to ±1.5 | `main.py:3883` (+ `:2210`, `:4461`) |
+
+The third is the trap. `weight_engine.py:191–193`, verbatim:
+> *"`total_adj` is clipped to [−1.5, +1.5] and added to `direction_score` before storing as
+> `confluence_score`. **Never applied to the gate check.**"*
+
+**Measured cost of not knowing this:** a first reconstruction that assumed one meaning
+(`raw + macro_gate_penalty == confluence_score`) matched **645 of 1,531 rows — 886 mismatches**,
+with a mismatch spike at exactly ±1.5 and a fractional tail (0.31, 0.34, −0.19, 1.16 …) no gate
+adjustment can produce.
+
+🔴 **THE RULE: reconstruct the score from `matrix_breakdown_json`, never from `confluence_score`.**
+That column is assigned **once**, at `main.py:3678`, *before* the gate, and the identical string is
+written on every branch. Reconstruction from it validates **660/660** exact (594 `below_threshold`
+as raw+adj, 39 `risk_halt` as raw, 27 `executed` as raw) and **898/898** exact on regime.
+
+**Also do not trust `macro_gate_penalty` to be present:** it is **NULL on every `risk_halt` row**,
+so the gated score is not computable for those 39 rows. Say so rather than defaulting it to 0.
+
+⚠️ **NOT FIXED, only documented — and here is why.** Splitting this into distinct columns needs a
+schema migration plus edits to every reader (`optimizer._bucket_confluence`, `claude_advisor`'s
+prompt builder, `skip_attribution`) while real money sits in an open position. That is a behaviour
+change wearing a cleanup's clothes, and it would need its own verification cycle. **Proposed, not
+done.** Until it is done, this box is the guard.
+
 ---
 
 ## 1. ✅ LIVE-PATH PARITY GAP — **CLOSED** by items 11/12/13 (`5f054b7`, `0833f42`, `d63cb8b`)
@@ -342,6 +377,62 @@ exchange applies, not `config.LEVERAGE`.
 ---
 
 ## 2. STILL OPEN — carry forward
+
+### 2.0 🔴 PRE-REGISTERED: `CONFLUENCE_SCORE_THRESHOLD` 2.0 → 3.0 — WRITTEN BEFORE THE CHANGE SHIPPED
+
+> **SHIPPED `dee6cee`, 2026-07-30 21:26:19 UTC. Service restarted 21:26:34, runtime==commit proven,
+> constant reads 3.0 in the loaded bytecode. The block below was written at 21:20, BEFORE the edit.**
+> Post-change verification is in the 2026-07-30 21:35 report.
+
+**Written 2026-07-30 21:20 UTC, BEFORE the edit was applied, so the expected effect cannot be
+restated after the fact.** Numbers come from the 21:12 distribution report, measured on the
+30 days ending 2026-07-30 19:00 over **1,531 events that reached the score gate** (TREND 630,
+FLAT 901). Reconstruction validated **660/660** exact on score, **898/898** exact on regime.
+
+**THE PREDICTION — judge the change against these five numbers, not against a later retelling.**
+
+| # | quantity | before | **predicted after** |
+|---|---|---:|---:|
+| 1 | refusal rate on TREND signals reaching the score gate | **4.52%** (27/598) | 🔴 **15.72%** (94/598) |
+| 2 | additional refusals per 30 days | — | 🔴 **+67** (≈**2.2/day**) |
+| 3 | TREND trades removed, last 23 executed | — | 🔴 **3 of 23 (−13%)** — **vpos 68, 71, 78** |
+| 4 | cap refusals that would have become trades (capacity effect) | — | **5 of 75 (6.7%)** — small, not zero |
+| 5 | `CONFLUENCE_FLAT_THRESHOLD` | 5.0 | **5.0 — DELIBERATELY UNCHANGED** |
+
+**REVIEW POINT — after 15 executed entries under the new bar.** Compare the realised entry rate
+against the **15.72%** prediction and outcomes against the pre-change book.
+🔴 **If the entry rate diverges materially from the prediction, that is a finding about the
+distribution — NOT a reason to move the bar again.** Written here so that instinct is pre-empted.
+
+**THE BASIS, on the record (operator's, 2026-07-30 21:18):**
+
+1. **2.5 removes 0 of 23 trades — it does nothing. 3.0 is the smallest bar that binds at all.**
+2. **3.5 is the cliff:** 10 of 23 trades. And on the **RAW** scale, 3.0 and 3.5 refuse the
+   *identical* 144 events — buckets `[2.75, 3.00)`, `[3.00, 3.25)`, `[3.25, 3.50)` are **empty**.
+   So anything above 3.0 is **bought purely with `total_gate_adj`, not with signal quality.**
+3. 🔴 **The load-bearing evidence is NOT the n=11 cohort.** It is the skip-drift band split from
+   the 19:14 report: the **2.0–3.0** band drifted **−0.324%**/24h over n=93 (*refusing was right*),
+   the **3.0–4.0** band drifted **+0.463%** over n=188 (*refusing was wrong*). **3.0 sits exactly on
+   that boundary. 4.0 crosses it.** This is why the bar is 3.0 and not 4.0, despite §2 of the 19:14
+   report showing +3.19R at 4.0 over n=5 — that cohort is not what this decision rests on.
+4. **Structurally:** a raw score of 2.25–2.75 means **essentially only the trigger scored.**
+   A *confluence* gate that admits signals with no confluence is not doing what its name says.
+
+**WHY `CONFLUENCE_FLAT_THRESHOLD` WAS NOT TOUCHED — and must not be, without new evidence.**
+The FLAT floor already refuses **78.86%** of what it judges (705/894), against the TREND bar's
+4.52% — a 17× difference on the same scale. And the band it refuses most heavily, **3.0–4.0**, is
+the band whose refusals measured **most costly** (+0.463%/24h, n=188). Tightening FLAT runs
+straight into that number. Raising it is not a smaller version of this change; it is the opposite
+change.
+
+🔴 **A structural inversion that becomes live above 5.0, restated so it is not rediscovered:** at a
+TREND bar above 5.0 the FLAT floor stops being a floor and becomes a **discount** — a FLAT signal
+at 5.5 would pass while a TREND signal at 5.5 would be refused. At **3.0 this is not active** and
+observed rows that would flip are **0**. It is a construction defect waiting, not one in force.
+
+**What this change does NOT do.** It cannot admit anything — raising the bar only adds refusals.
+It does not touch the FLAT branch, the HTF cascade (4,077 refusals, 72.7% of all refusing), or the
+LLM (831). **The score gate remains a minority gate**; this makes it a real one, not a large one.
 
 ### 2.1 LONG partial parameters are placeholders
 `LONG_PARTIAL_LEVEL_R = 1.0`, `LONG_PARTIAL_FRACTION = 1/3` were chosen as **round numbers that
