@@ -1453,6 +1453,13 @@ Also: id **80** carries `vpos_id = 89` (SHORT, entry 63595.5, orig SL 64714.5, o
 **87**; `recheck_events` / `position_excursion_samples` / `smart_exit_dryrun_samples` know only 86 and
 87. Both ghosts are stamped **2026-07-29 21:50**.
 
+> 🔴 **CORRECTED 2026-07-30 22:35 — "no row 88 or 89" is true TODAY and false TOMORROW.** This
+> paragraph reads as if 89 were permanently vacant; §2.28a made that explicit with *"has no row 89 and
+> **never will**"*. **Wrong.** `sqlite_sequence` at **87** is exactly the reason ids **88 and 89 are
+> the next two AUTOINCREMENT values to be issued** — the sequence is the high-water mark, not a
+> ceiling. Row 80 was therefore two positions away from blocking a real vpos 89.
+> **Row 80 has since been re-keyed to `vpos_id = -80` — see §2.28b.**
+
 #### 2.28a ✅ DIAGNOSED 2026-07-30 13:40 — test-harness residue, and **TWO CORRECTIONS to the 13:09 report**
 **Read-only. Nothing touched.** The 13:09 report guessed two things about these rows and got both
 wrong; the backups and the journal settle it.
@@ -1473,9 +1480,13 @@ its drift slots can only be seeded by `on_real_close`, which needs a `virtual_po
 never exist (**0 drift rows**). It is **inert** — a permanently non-terminal row, re-read by `tick()`
 every 5 s forever and never able to complete.
 **Row 79 is the active one.** `on_real_close` seeded it 5 drift slots off today's real close: 15m and
-1h are sampled (12:06 → 64831.3, 12:51 → 64867.1); **4h (15:50), 12h (23:50) and 24h (tomorrow
+1h are sampled (12:06 → 64831.3, 12:51 → 64867.1); ~~**4h (15:50),**~~ **12h (23:50) and 24h (tomorrow
 11:50) are still due.** Its *drift* leg is sound — it measures from the real 64733.0 exit. Its
 *shadow* leg and `exit_advantage_r` remain the cross-position figures above.
+
+> 🔴 **CORRECTED 2026-07-30 22:35 — the 4h slot is NOT pending. It sampled at 15:51:22
+> (price 64705.9, pct +0.04186), about two hours after this paragraph was written.** Three of five
+> slots are banked. Only 12h and 24h remain due. **Row 79 has since been REPAIRED — see §2.28b.**
 
 **HOW THEY GOT THERE — reconstructed from two DB backups and the journal, not guessed:**
 
@@ -1511,6 +1522,68 @@ and both are data decisions):
   recomputed. Until then, **do not quote row 79's `exit_advantage_r`.**
 - 🔴 **Neither should be touched before the `on_entry` guard exists**, or the next id re-use recreates
   exactly the same row.
+
+#### 2.28b ✅ CLOSED 2026-07-30 22:40 — guard shipped, row 79 REPAIRED, row 80 RE-KEYED
+
+**Guard: `45e20e7` + `54dc734`. Data repair: no code, no restart.** The guard was shipped first, so
+neither row could be recreated by the next id re-use. Order was not optional.
+
+##### 🔴 THE AUDIT TRAIL — row 79's BEFORE values, verbatim, so the corruption survives its repair
+
+These are the values the row carried while it was cross-position. **Any figure quoted from row 79
+before 2026-07-30 22:36 UTC is one of these, and is a cross-position number.**
+
+| field | **BEFORE (ghost identity)** | AFTER (real vpos 86) |
+|---|---:|---:|
+| `entry_price` | `63605.6` | `63686.0` |
+| `original_sl_price` | `64724.6` | `64767.1` |
+| `opened_at` | `'2026-07-29T21:50:04.012998+00:00'` | `'2026-07-30T00:50:14.893642+00:00'` |
+| `shadow_pnl_pct` | `-1.0500647741708224` | `-0.9224947398172256` |
+| `shadow_pnl_r` | `-0.5968722073279727` | `-0.5434279900101755` |
+| `exit_advantage_pct` | `0.5939386174694139` | `0.7215086518230107` |
+| `exit_advantage_r` | 🔴 `0.4252543887272212` | `0.47869860604501846` |
+
+**The published `exit_advantage_r = +0.42525` is now formally superseded by `+0.47870`.** The 1R basis
+changed with the identity: ghost `|63605.6 − 64724.6|` = 1119.0 pts → real `|63686.0 − 64767.1|` =
+1081.1 pts. Sign survived; §2.28's warning that the mechanism *can* flip one still stands.
+
+**Why repair rather than retire.** The shadow leg was proven valid for vpos 86, not assumed: the real
+window `00:50:14 → 02:00:05` is a strict **subset** of the ghost window `21:50:04 → 02:00:05`; the
+exit reason `15m_signal` (Bullish I-CHOCH) is a **market event** at a **market price**, independent of
+entry; and the ghost's SL **64724.6 is TIGHTER than the real 64767.1 for a SHORT** (by 42.5 pts) and
+was not hit before the signal, so the wider real SL cannot have been hit either. Only the
+entry-relative arithmetic needed recomputing, and both inputs survived. Live-money observatory records
+will be scarce for months — discarding one to preserve a corrupted identity was the wrong trade.
+
+**Method:** guarded predicate matching exactly 1 row, and the derived four recomputed by the module's
+**own** functions (`_compute_shadow_pnl`, `_maybe_compute_advantage`), never by fresh arithmetic.
+**All 15 real-leg / shadow-exit / drift / max-favourable fields verified byte-identical afterwards**;
+`virtual_positions[86].net_pnl = -2.541574` still equals row 79's `real_net_pnl`.
+
+##### Row 80: `status='failed'` (22:21) **and** `vpos_id = -80` (22:37)
+
+🔴 **THE NEW GENERAL FACT, which is what made the guard's first remedy text wrong:
+`status='failed'` does NOT free a `UNIQUE` `vpos_id`.** Status controls only whether `tick()` picks
+the row up (`_active_rows()` filters `status NOT IN ('completed','failed')`). The `UNIQUE(vpos_id)`
+constraint — and the identity guard, which keys on `vpos_id` regardless of status — keep matching a
+retired row forever. **Retiring an observatory row therefore takes TWO columns, always:**
+
+```sql
+UPDATE post_exit_observatory
+   SET status='failed', vpos_id = -<id>, updated_at = datetime('now')
+ WHERE id = <id>;
+```
+
+A negative key cannot collide with any AUTOINCREMENT id, and the row keeps its full history —
+row 80's shadow leg, `shadow_signal_details` and timestamps are all intact; only `vpos_id` and
+`updated_at` changed. **Nothing was deleted anywhere.** `54dc734` corrected the guard's shout to name
+both statements, *before* either row was touched.
+
+##### Verified state after the pass
+Full replay of all 42 observatory rows against `virtual_positions`: **41 match, 0 would be refused**
+(was 1), 1 retired under a negative key and unreachable by any real id. `_identity_conflict()` run
+live against the DB returns `None` for a future **vpos 88** and **vpos 89**, and for **vpos 86** now
+that row 79's identity agrees. `virtual_positions` still **61 rows**; observatory still **42**.
 
 ### 2.29 🔴 `weighted_adj`'s OWN DOCSTRING IS HALF FALSE — the adjusted score is not stored either
 `weight_engine.py`: *"Gate policy: `weighted_adj()` is NEVER applied to the raw `direction_score` that
