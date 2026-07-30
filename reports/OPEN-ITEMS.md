@@ -403,6 +403,75 @@ and `_build_exit_context` never set `depth_pct`. Now read from the latest `order
 percentiled through the same `_exit_pct()` baseline, with the sample age printed so a stale row is
 visible. Both advisors now describe depth in the same language.
 
+### 2.4-OP 🔴 OPERATOR RULING, 2026-07-30 13:40 — THE WINDOW, AND WHY IT CANNOT RESET AGAIN
+**Recorded BEFORE the window opens, which is the whole point.** Three decisions, all the operator's,
+written here verbatim in effect so no later session can soften them.
+
+**1 · STRICT on vpos 86 — it contributes ZERO.** Its **first** `close` verdict (01:50:24) was
+produced under the cross-source book defect. Nominating the 03:50:29 verdict as "the first" is
+exactly the re-cut the criterion forbids. **§2.4 stays 0 of ~10.** The nine clean-book verdicts are
+kept as an operational fact (§2.4b), not as a datapoint.
+
+**2 · NO THIRD RESTART, EVER, AND THE REASON IS A FAILURE MODE OF ITS OWN.** The count has restarted
+twice (`c307bb7`, `957f980`) and a **second, independent** contamination was then found in the same
+sample (§2.26, the ADX window). Operator's ruling, and it is correct:
+
+> **If every fix voids the accumulated sample, the criterion becomes unfalsifiable by attrition.**
+
+So the rule is now:
+
+- 🔴 **The criterion's window BEGINS at the commit that fixes the ADX window defect (§2.26).**
+  Nothing before that commit counts. Nothing before it will ever be re-admitted.
+- 🔴 **From that commit the exit prompt's INPUTS ARE FROZEN for the window's duration.** No change to
+  `_build_exit_context`, `claude_advisor`'s close template, the book block, the regime block, the
+  tier block, the trail block, or any figure rendered into the close prompt — **without explicitly
+  VOIDING the window and RESTATING it in this file, in the same commit as the prompt change.**
+  A silent prompt change during the window is the defect this rule exists to prevent.
+- 🔴 **If a defect is found DURING the window: finish the window and record the caveat. Do not
+  reset.** The result is then reported with the defect stated alongside it, and the operator decides
+  what the caveat is worth. A noted caveat on a completed window beats a third empty restart.
+- **Freeze scope, stated precisely so it cannot be lawyered:** frozen = everything the advisor READS.
+  Not frozen = what is done with the verdict (act/hold plumbing), logging, labels, the close
+  mechanics, or anything on the ENTRY side. Fixing a *close mechanic* does not void the window;
+  changing a *number the advisor sees* does.
+
+**3 · Record the nine verdicts as an OPERATIONAL fact with their arithmetic — see §2.4b.** Not
+admissible for §2.4, and it is still the strongest signal we have about the advisor; it must not
+vanish because of a rule.
+
+### 2.4b vpos 86 — NINE clean-book `close` verdicts, ALL of which beat the actual exit (operational)
+**Not a §2.4 datapoint (see §2.4-OP·1). Recorded because a rule that discards evidence must not also
+erase it.** All nine were issued after `625fedc` deployed at 02:51:11, i.e. on a corrected book
+block. Counterfactual net computed at the nearest `position_excursion_samples` price, entry fee
+0.073239 actual + exit fee at the 0.0005 taker rate; R against `initial_risk_usdt` 2.48655500.
+
+| trades row | UTC | px (nearest sample) | net if closed | R | vs actual |
+|---|---|---:|---:|---:|---:|
+| **19607** | **03:50:29 (first)** | 64191.30 (03:52:45) | **−1.3092** | −0.527 | **+1.2324 / +0.495R** |
+| 19617 | 04:50:34 | 64060.00 | −1.0071 | −0.405 | +1.5345 / +0.617R |
+| 19624 | 05:50:43 | 64038.70 | −0.9581 | −0.385 | +1.5835 / +0.637R |
+| **19628** | **06:50:53 (best)** | 63961.00 | **−0.7793** | **−0.313** | **+1.7623 / +0.709R** |
+| 19633 | 07:50:54 | 63970.00 | −0.8000 | −0.322 | +1.7416 / +0.700R |
+| 19646 | 08:45:12 | 64309.20 | −1.5806 | −0.636 | +0.9610 / +0.386R |
+| 19649 | 08:51:02 | 64288.30 | −1.5325 | −0.616 | +1.0091 / +0.406R |
+| 19660 | 09:51:11 | 64549.70 | −2.1340 | −0.858 | +0.4076 / +0.164R |
+| 19678 | 10:51:14 | 64569.20 | −2.1789 | −0.876 | +0.3627 / +0.146R |
+| — | **11:50:48 ACTUAL** | **64733.00** | **−2.541574** | **−1.02213** | — |
+
+**9 of 9 beat the actual exit. Range +0.146R to +0.709R.** Add the three contaminated-book `close`
+verdicts (01:50, 02:00, 02:50) and the advisor said `close` **twelve times over nine hours** on a
+position that then ran to its stop.
+
+🔴 **AND THE CAVEAT THAT MAKES THEM INADMISSIBLE TWICE OVER:** every one of these nine prompts also
+carried a warm-up-biased ADX (§2.26). Row 19590's own words — *"bearish regime (ADX rising to
+14.9)"* against a true entry ADX1h of 11.1 — are that artefact. So the nine are contaminated by the
+ADX seam even though their book block was clean. **This is the concrete case that motivated §2.4-OP·2:
+the sample was voided twice by two different seams, and a third reset would teach nothing.**
+
+**Two timing facts, for the record:** `exit_advisor_last_ts` was 10:51:11, so the next consult was
+due **11:51:11**; the stop filled at **11:50:47.926**, i.e. **23.1 s** earlier. The advisor was armed
+at 11:32:45. **Arming was correct and bought zero datapoints.**
+
 ### 2.4 Exit-advisor criterion — **REPLACED 2026-07-30 11:10 UTC, MEASURED THE OTHER WAY ROUND**
 The criterion is **not abandoned — it is mirrored.** Written into this file **BEFORE the advisor was
 given hands and therefore before any position could close under it**, for exactly the reason the
@@ -766,7 +835,7 @@ liquidation endpoint on 2026-05-15. Nothing to delete there.
 | table | rows | plan |
 |---|---|---|
 | `position_excursion_samples` | 2,885 | ✅ **§2.2 Variant C RUN 2026-07-29.** In the end the study used real 5m candles rather than these samples (§0 filter 4: never stored extrema for a path question); the table confirmed coverage. |
-| `smart_exit_dryrun_samples` | 228 | the chop-exit re-cut (`config.py:293`) has **never been done** |
+| `smart_exit_dryrun_samples` | 245 | the chop-exit re-cut (`config.py:293`) has **never been done** — 🔴 **AND ITS `adx_1h`/`adx_15m`/`adx_5m` COLUMNS ARE BIASED ON EVERY ROW WRITTEN BEFORE THE §2.26 FIX.** See the contamination ledger in §2.26. Re-cut on `adx_window = 200` only, or exclude ADX from the cut entirely |
 | `skip_drift_samples` / `skip_attribution` | 38,480 / 7,696 | used ad hoc; no standing plan |
 | `post_exit_drift_samples` / `post_exit_observatory` | 185 / 38 | **no plan recorded at all** |
 
@@ -1112,6 +1181,88 @@ would have scored **−5 → TIGHTEN**. The three `Health 0 / verdict OK` readin
 that is also why §2.20's no-op-TIGHTEN fix is still UNEXERCISED in live** (11 of 14 positions with
 recheck rows already ran all three tiers; only vpos 74 and 86 ever stopped at T+10, both on a TIGHTEN).
 
+#### 2.26a ✅ FIX WRITTEN AND VERIFIED — **NOT APPLIED. AWAITING THE OPERATOR** (2026-07-30 13:40)
+Patch prepared in a scratch tree; `/root/titan-bot` is **byte-identical to HEAD `81875c9`** and the
+service still runs the old code. **4 files, +404 / −40.** Two halves:
+
+**A · ONE WINDOW FOR ONE INDICATOR.** New `indicators.ADX_CANDLE_LIMIT = CANDLE_LIMIT` (by *identity*,
+so the entry reference and every later reading are one measurement rather than two literals kept in
+step by hand) and `indicators.adx_reading(exchange, symbol, tf)` — the only sanctioned way to read an
+ADX. It routes through `_fetch_ohlcv_cached`, so at T+10s it re-reads the bytes the entry snapshot
+cached ~13 s earlier: same value, **no extra request**.
+🔴 **ATR IS UNTOUCHED, and that was the trap.** `entry_atr_pct_1h` is derived from `execute_entry`'s own
+`ATR_LEN*3` 1h fetch, so moving ATR to 200 would have broken `atr_contraction` by changing ONE side of
+its comparison. Both `_recheck_fetch_1h_metrics` and `_tf_metrics_safe` now make **two** fetches on
+purpose — ADX on the converged window, ATR/vol_ratio/trend/ema_gap on the calibrated 42-bar one.
+Verified live on all three TFs: ATR% **byte-identical**, `trend` identical, only `adx` moves
+(1h 21.92→15.09, 15m 45.68→45.13, 5m 33.63→32.54).
+
+**B · THE PROVENANCE GUARD, §2.19's SHAPE.** `indicators.AdxReading(value, window, tf)` — a NamedTuple
+with **no defaults**, so a reading cannot be built without stating all three (the required-positional
+half). `adx_delta()` **refuses** across windows or timeframes and returns `None`, so the rule SKIPS;
+`usable_for_threshold()` demands the sanctioned window, so an unconverged value **cannot be tested
+against `ADX_BELOW_FLOOR` at all** (the WHERE-clause half: unobtainable, not merely unlabelled). A
+bare float reaches neither. Skips are written into `reasons_json` so a silent skip cannot read as a
+passed check. Three new columns persist the window: `virtual_positions.entry_adx_1h_window`,
+`recheck_events.adx_window`, `smart_exit_dryrun_samples.adx_window`.
+The exit prompt now **refuses to imply a change it cannot support**: when the sample's window is not
+the sanctioned one it prints the figure raw and states in words that no rise or fall may be inferred —
+§2.19's precedent applied verbatim.
+
+**🔴 THE BEHAVIOUR CHANGE, QUANTIFIED BEFORE IT SHIPS.** Replayed all **38** `recheck_events` rows with
+the 200-bar ADX recomputed at each row's own timestamp from real 1h candles (854 candles, 2026-06-25
+onward; the forming-candle `iloc[-1]` call reproduced exactly). **Reconstruction of the STORED score
+from the STORED inputs: 38/38 exact**, so the replay is validated before it is trusted.
+
+| | |
+|---|---|
+| OK verdicts today | **36** of 38 |
+| **become TIGHTEN on the corrected window** | **9 of 36 = 25%** |
+| become EMERGENCY_CLOSE | **0** — min score −6, the emergency floor is −10 |
+| TIGHTEN → OK (a rule turned OFF) | **0** |
+| difference made by re-enabling `adx_drop` | **NONE** — 9 either way |
+
+**The 9 are three positions, all LONG, all with a true ADX1h under the floor: vpos 82 (16.88, ×3
+tiers), vpos 85 (16.81, ×3), vpos 87 (13.83, ×3).** So it is **not** a rule that fires constantly —
+**25% of tier runs, 3 of 14 positions** — and the answer to "are we turning on something that fires
+all the time" is **no**.
+
+🔴 **AND WHAT A TIGHTEN ACTUALLY DOES HERE MATTERS MORE THAN THE COUNT: nothing, on the exchange.**
+The recheck only runs pre-breakeven, where the `93c20c3` bound forces `new_sl == current_sl` — so all
+9 become **no-op TIGHTENs**: `t+{tier}_ok` written, later tiers stay due, **exchange stop untouched**,
+one advisory Telegram line per tier. In practice this converts 9 silent `OK`s into 9 honest advisories
+and **moves no money**. It also, finally, **exercises the §2.20 branch that has never run** — which is
+the point the operator predicted, and it is why the ADX fix and §2.20 are one story.
+
+**The `adx_drop` rule and legacy rows — a decision, with its cost measured rather than assumed.**
+Legacy `virtual_positions` rows have `entry_adx_1h_window = NULL`, so `adx_drop` **refuses** for
+them (including the open vpos 87) instead of comparing across a possibly-mismatched window. Those
+values genuinely *were* 200-bar (`fetch_snapshot` is their only producer and `CANDLE_LIMIT` has been
+200 in the entire git history of `indicators.py` — one `+CANDLE_LIMIT = 200`, never changed), so a
+backfill would be **correct**. It is **NOT done anyway**: asserting provenance from a code invariant
+is the habit that produced this defect, and the measured cost of refusing is **zero verdicts across
+all 38 rows**. Legacy rows lose a rule that has never once fired.
+
+#### 2.26b 🔴 CONTAMINATION LEDGER — every ADX these tables hold before the fix is SUSPECT
+**Mark, do not re-run.** Nothing is re-analysed here; this exists so no future cut is done in
+ignorance.
+
+| table · column | rows affected | what is wrong | how to cut it safely |
+|---|---:|---|---|
+| `smart_exit_dryrun_samples.adx_1h` / `.adx_15m` / `.adx_5m` | **all 245 existing rows** | computed on `ATR_LEN*3 = 42`; biased **+6.23 mean / +5.38 median** on 1h, +4.3 pts on 15m | `WHERE adx_window = 200`. Post-fix rows carry it; the 245 legacy rows are NULL |
+| `recheck_events.adx_1h` | **all 38 existing rows** | same 42-bar window | `WHERE adx_window = 200` |
+| `recheck_events.adx_delta` | **all 38 existing rows** | 🔴 **worse than biased — it is a CROSS-WINDOW subtraction**: `entry_adx` (200-bar) − `adx_1h` (42-bar). It is not a measurement of anything | do not use any legacy `adx_delta`. Post-fix rows are refused-or-valid, never mixed |
+| `recheck_events.health_score` / `.verdict` / `.reasons_json` | **38 rows** | both ADX rules were biased toward "healthy": the floor missed 52.9% of true sub-floor states, and `adx_drop` was silenced by a systematically-high `cur_adx` | treat every historical `OK` as **"OK, or an unfired ADX rule"**. The corrected replay is in §2.26a: 9 of 36 flip |
+| `trades.srv_adx_*` (entry side) | ✅ **clean, all rows** | `fetch_snapshot(limit=CANDLE_LIMIT)` is its sole producer and that literal never changed | usable as-is. **This is why the entry advisor's ADX figures were never wrong** |
+| §2.16 chop-exit re-cut | **not yet done** | would have run on the 245 biased rows | do it on `adx_window = 200` only, or drop ADX from the cut |
+
+**Any past analysis quoting a recheck ADX, a recheck `adx_delta`, or a sampler `adx_*` is suspect and
+should be re-derived, not trusted.** Known instances in this file and in reports: §2.22's *"the
+recheck scored that same value −5 eleven seconds later"* (that one is **correct** — vpos 86's 42-bar
+11.271 and its true 11.117 barely differ, which is exactly why the defect hid: at genuinely low ADX
+the bias collapses), and every *"ADX rising to X"* / *"regime strengthened"* line quoted from an exit
+verdict, all of which are artefacts.
+
 ### 2.27 🔴 §2.4 IS CONTAMINATED A SECOND TIME — and vpos 86 produced NINE clean-book `close` verdicts
 Contrary to the 11:39 prediction that vpos 86 would contribute zero, it produced **nine `close`
 verdicts after the `625fedc` deploy at 02:51:11**, every one on a corrected book block, and **every
@@ -1156,11 +1307,66 @@ shadow leg priced off entry 63605.6 with a real leg from a position that entered
 Also: id **80** carries `vpos_id = 89` (SHORT, entry 63595.5, orig SL 64714.5, opened
 2026-07-29T21:50:11) while `virtual_positions` has **no row 88 or 89** and `sqlite_sequence` is at
 **87**; `recheck_events` / `position_excursion_samples` / `smart_exit_dryrun_samples` know only 86 and
-87. Both ghosts are stamped **2026-07-29 21:50**, inside the naked-position window. The §7 caveat
-*"the naked short has no `virtual_positions` row"* stays true — **but it DOES have a surviving record,
-with an entry price and a stop.** And row 80 is **still live** (`updated_at 2026-07-30T02:00:14`): the
-02:00 15m signal armed a shadow exit on it. **A phantom position is accumulating shadow data.**
-**Nothing touched** — `feedback_no_delete_virtual_positions` is standing and this is a data decision.
+87. Both ghosts are stamped **2026-07-29 21:50**.
+
+#### 2.28a ✅ DIAGNOSED 2026-07-30 13:40 — test-harness residue, and **TWO CORRECTIONS to the 13:09 report**
+**Read-only. Nothing touched.** The 13:09 report guessed two things about these rows and got both
+wrong; the backups and the journal settle it.
+
+🔴 **CORRECTION 1 — row 80 is NOT the naked short's surviving record. It is not the naked short at
+all.** The naked short happened in the **FIRST** live window, before the 21:26:52 revert
+(`11055e2`). Rows 79/80 are stamped **21:50:04** and **21:50:11**, which is **inside the PAPER
+interlude** (21:26:52 → 21:54:16) — proven independently by the 21:53:11 boot banner in the journal:
+`🧪 PAPER — simulated fills only ... LIVE_TRADING_ENABLED=False ... margin $2000 x 5`. **So no real
+money is implicated by either row**, and the §7 caveat is unchanged and complete: the naked short's
+−$0.26 is still recorded only in prose, nowhere in the DB.
+
+🔴 **CORRECTION 2 — row 80 is NOT accumulating; row 79 IS.** Row 80 stopped being writable at
+**02:00:14** on 07-30: `on_15m_exit_signal` updates only
+`WHERE shadow_exit_at IS NULL AND status IN ('shadow_armed_pending_close','shadow_armed_post_close')`,
+and row 80 now has `shadow_exit_at` set with `status='shadow_pre_close'`, so it can never match again;
+its drift slots can only be seeded by `on_real_close`, which needs a `virtual_positions` row that will
+never exist (**0 drift rows**). It is **inert** — a permanently non-terminal row, re-read by `tick()`
+every 5 s forever and never able to complete.
+**Row 79 is the active one.** `on_real_close` seeded it 5 drift slots off today's real close: 15m and
+1h are sampled (12:06 → 64831.3, 12:51 → 64867.1); **4h (15:50), 12h (23:50) and 24h (tomorrow
+11:50) are still due.** Its *drift* leg is sound — it measures from the real 64733.0 exit. Its
+*shadow* leg and `exit_advantage_r` remain the cross-position figures above.
+
+**HOW THEY GOT THERE — reconstructed from two DB backups and the journal, not guessed:**
+
+| evidence | what it shows |
+|---|---|
+| `/root/backups/pre-adapter-20260729-164638/trades.db` (07-29 **16:46**) | `virtual_positions` max **85**, `sqlite_sequence` **85**, observatory max id **77**. **No 79/80.** |
+| `/root/backups/pre-exit-advisor-act-20260730-113107/trades.db` (07-30 **11:31**) | observatory **79 and 80 present** with the 21:50 stamps; `virtual_positions` max **86**, `sqlite_sequence` **86** |
+| journal, 07-29 19:00 → 07-30 01:00 | **exactly ONE** `VIRTUAL ENTRY vpos=` line — vpos 86 at **00:50:15**. **Nothing at 21:50.** |
+| `on_entry` re-SELECTs `virtual_positions WHERE id=?` and arms only if the row exists | rows **86 and 89** must have EXISTED at 21:50 — so 86, 87, 88, 89 were all allocated |
+| `sqlite_sequence` is **86**, and AUTOINCREMENT never lowers itself | the sequence was **explicitly reset** (or its row deleted) after those ids were consumed |
+| the two rows are **7.6 s apart on the SAME side**, which `MAX_POSITIONS_PER_SIDE = 1` + `ux_vpos_one_open_per_side` forbid concurrently | create → delete → create, i.e. a **test loop**, not normal operation |
+| BTC 1h candle 07-29 21:00 ranged **63231.6–63829.7** | the ghost entries 63605.6 / 63595.5 are real market prices of that minute |
+
+**CONCLUSION: rows 79/80 are residue from an ad-hoc script — run OUTSIDE the service, during the
+21:26–21:54 paper interlude, to exercise the naked-position fix (`97a4fdb`).** It created
+`virtual_positions` rows 86–89, which armed the observatory; the rows were then deleted and the
+sequence reset to leave a clean book before going live at 21:54:16 — and `post_exit_observatory`,
+being a separate table nobody was thinking about, kept its two rows. Today's real vpos 86 then
+re-used id 86, and `on_entry`'s `ON CONFLICT(vpos_id) DO NOTHING` silently preserved the ghost.
+
+**THE CODE DEFECT, separable from the data mess:** `on_entry` treats `vpos_id` as a stable identity.
+It is not — `virtual_positions.id` is unique only among rows that still EXIST. The §2.19-shaped fix is
+to make the conflict **speak**: if an existing row's `opened_at` differs from the incoming one, that
+is a different position and `on_entry` must **refuse and shout**, not adopt. **NOT written and NOT
+proposed here** — the operator sequenced the observatory after the ADX fix.
+
+**What would stop each, stated and NOT acted on** (`feedback_no_delete_virtual_positions` is standing
+and both are data decisions):
+- **Row 80:** set `status` to the existing terminal sentinel `'failed'` — that removes it from
+  `tick()`'s working set. One column, on a row describing a position that never existed.
+- **Row 79:** a status change cannot repair it. `entry_price` / `original_sl_price` / `opened_at`
+  would have to be corrected to vpos 86's real values **and** `shadow_pnl_r` / `exit_advantage_r`
+  recomputed. Until then, **do not quote row 79's `exit_advantage_r`.**
+- 🔴 **Neither should be touched before the `on_entry` guard exists**, or the next id re-use recreates
+  exactly the same row.
 
 ### 2.29 🔴 `weighted_adj`'s OWN DOCSTRING IS HALF FALSE — the adjusted score is not stored either
 `weight_engine.py`: *"Gate policy: `weighted_adj()` is NEVER applied to the raw `direction_score` that
