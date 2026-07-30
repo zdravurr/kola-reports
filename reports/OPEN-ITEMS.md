@@ -403,14 +403,48 @@ and `_build_exit_context` never set `depth_pct`. Now read from the latest `order
 percentiled through the same `_exit_pct()` baseline, with the sample age printed so a stale row is
 visible. Both advisors now describe depth in the same language.
 
-### 2.4 Exit-advisor activation criterion — RECORDED BEFORE ANY DATA EXISTED
-Written down **deliberately in advance** so the bar cannot be moved after seeing results.
+### 2.4 Exit-advisor criterion — **REPLACED 2026-07-30 11:10 UTC, MEASURED THE OTHER WAY ROUND**
+The criterion is **not abandoned — it is mirrored.** Written into this file **BEFORE the advisor was
+given hands and therefore before any position could close under it**, for exactly the reason the
+original was written in advance: so the bar cannot be moved after seeing results.
 
+#### 🔴 THE CRITERION IN FORCE (from the commit that sets `EXIT_ADVISOR_DRYRUN = False`)
+
+> For every position the advisor CLOSES, replay from **real 5m candles** what the unchanged contract
+> would have done had the position been held — **stop, breakeven, trail, LONG partial, and any
+> intrabar ambiguity resolved ADVERSELY to the held branch's favour being overstated** — and record
+> **advisor-close vs held-branch** in USDT.
+> It stays live only if, over the first **~10 advisor-closed positions**, the advisor beats the
+> held branch **both in total USDT and in positions improved**.
+> **No partial credit. No re-cutting the sample. Every advisor close counts** — not its best ones.
+
+**Same bar, same ~10, same no-re-cutting rule.** What changed is which branch is counterfactual.
+
+**WHY THE MIRROR IS LEGITIMATE, stated as the operator put it and not softened:** the original
+justification for DRYRUN was that both branches stay observable — the verdict *and* what actually
+happened. **That justification was weaker than it was presented.** The held branch is
+**recoverable from candles**, and this project has reconstructed exactly this kind of counterfactual
+from OHLCV three times: **13,536 candles** for the stop counterfactual, **101,739** for the wick
+study, **18,900 bars** for Variant C. Replaying "what if we had held" is a solved problem here, not
+a lost observation. **So the real cost of DRYRUN was never preserved knowledge — it was forgone
+action**, and on vpos 86 that cost is measurable (§2.4a).
+
+**WHAT THE MIRROR CANNOT RECOVER, stated so it is not discovered later as a surprise:** funding
+accrued on the held branch is estimated, not ledgered; and a held branch that would have been closed
+by a *future advisor verdict* is not modelled — the replay holds to the mechanical contract only.
+Both bias the comparison **toward the held branch**, i.e. against the advisor. That is the safe
+direction and is deliberate.
+
+#### The wording this replaced — kept verbatim as the record
 > It goes live only if, over the first **~10 closed positions**, its **FIRST** `"close"` verdict
 > beats the actual exit **both in total USDT and in positions improved**.
 > **No partial credit. No re-cutting the sample. First verdict only** — not its best verdict.
 
-🔴🔴 **Progress: 0 of ~10 — RESTARTED A SECOND TIME at `957f980`, 2026-07-30 02:51 UTC.**
+It was measurable only while the advisor was blocked: it asks whether the advisor's first `close`
+**would** have beaten an exit that something else produced. Once the advisor produces the exit, that
+question has no held branch left to compare against — hence the mirror above, not a weakening.
+
+🔴🔴 **Progress under the OLD criterion: 0 of ~10 — RESTARTED A SECOND TIME at `957f980`, 2026-07-30 02:51 UTC.**
 **(Previous restart: `c307bb7`, 2026-07-29 13:21 — see §2.18. That restart is now itself void, and
 the two datapoints it had collected, vpos 84 and vpos 85, are discarded with it.)**
 
@@ -508,6 +542,44 @@ inverted percentile, so **none count toward §2.4**. Logged as an operational re
 price and is unaffected by the percentile defect. That is an argument for reading them, not for
 counting them. **The first verdict is what §2.4 measures, and for vpos 86 that was `hold` at −0.01R**
 — recorded before the outcome is known, so the bar cannot be moved afterwards.
+
+#### 🔴 THE NINE CLEAN VERDICTS — first admissible ones, recorded 11:10 UTC WHILE THE TRADE IS STILL OPEN
+Every consult since the `957f980` fix at 02:51:11. **All nine say `close`, all at confidence 0.72.**
+Position R is computed from `position_excursion_samples` (nearest sample at or before the verdict),
+**not** from the advisor's own text — the two agree to within ~0.05R everywhere they overlap.
+
+| row | time (UTC) | trigger | verdict | conf | px | position R | to stop |
+|---|---|---|---|---:|---:|---:|---:|
+| 19607 | 03:50:29 | hourly | **`close`** | 0.72 | 64162.8 | **−0.441R** | 0.559R |
+| 19617 | 04:50:34 | hourly | **`close`** | 0.72 | 64060.0 | **−0.346R** | 0.654R |
+| 19624 | 05:50:43 | hourly | **`close`** | 0.72 | 64038.7 | **−0.326R** | 0.674R |
+| 19628 | 06:50:53 | hourly | **`close`** | 0.72 | 63961.0 | **−0.254R** | 0.746R |
+| 19633 | 07:50:54 | hourly | **`close`** | 0.72 | 63982.0 | **−0.274R** | 0.726R |
+| 19646 | 08:45:12 | `15m_exit_confirm` | **`close`** | 0.72 | 64252.0 | **−0.524R** | 0.476R |
+| 19649 | 08:51:02 | hourly | **`close`** | 0.72 | 64309.2 | **−0.576R** | 0.424R |
+| 19660 | 09:51:11 | hourly | **`close`** | 0.72 | 64608.0 | **−0.853R** | 0.147R |
+| 19678 | 10:51:14 | hourly | **`close`** | 0.72 | 64569.2 | **−0.817R** | 0.183R |
+
+**The book block is now provably the right scale.** Every one of the nine carries the header
+`source: OKX books-full depth-4000 (the percentile baseline)` and an internally consistent reading —
+e.g. 19678: `Supporting wall x7.4 = 70th pct · Opposing wall x4.5 = 23th pct · Imbalance 0.38 = 0th
+pct · Total depth 3155 BTC = 70th pct`. **The phantom "93rd-percentile wall" that talked the advisor
+into holding at 00:50 does not recur in any of the nine.** `625fedc` is proven on live data.
+
+**Their common thesis, unchanged across seven hours:** the entry was 4/4 lower-TF BEAR; 15m and 5m
+went NEUTRAL, then BULL. Verbatim from 19678 (10:51): *"At entry: 4/4 lower-TF alignment
+(4h/1h/15m/5m all BEAR). Now: 15m=BULL, 5m=neutral. Regime flipped bullish on lower timeframes.
+ADX15m surged to 32.1. Imbalance collapsed from 0.51→0.38 (entry edge gone, now at 0th percentile —
+weakest reading)."*
+
+**Recorded before the trade resolves, so the datapoint exists whichever way it goes.** The advisor's
+best available exit was **−0.254R at 06:50**; by 09:51 the position was **−0.853R with 0.147R of
+stop cushion left**. It has since printed a new MAE of **64613.7 (−0.858R)** against an MFE that
+never exceeded **+0.099R**.
+
+🔴 **NONE OF THESE NINE CAN BE ACTED ON**, and not because of the DRYRUN flag — because of the
+call-site defect in §2.23. They were produced by the `hourly` and `15m_exit_confirm` triggers, and
+**neither of those paths contains a close mechanic at all.**
 
 ### 2.5 Volume ceiling — NOT BUILT, and has an EXPIRY
 Clean n is **5 SHORT / 4 LONG** (2026-07-29). SHORT **p = 0.333**; LONG **contradicts** the thesis (p = 1.000).
@@ -868,6 +940,62 @@ Fourth, fifth and sixth instances of *"check not only what the gate DECIDES, but
   reads. The 1h then was **11.1, below the FLAT floor of 20**; the recheck scored that same value −5
   eleven seconds later. Now prints `ADX 5m: 25.87 | 1h: 11.12 ← the gates read this`.
 
+### 2.23 🔴🔴 THE ADVISOR'S OFF-SWITCH ALSO SILENCES IT — `DRYRUN=False` WOULD HAVE MADE IT MUTE, NOT ACTIVE
+**Found 2026-07-30 11:05 while preparing exactly the one-line flip this item now forbids.**
+`EXIT_ADVISOR_DRYRUN` reads as "record the verdict, do not act on it". It is **two switches wearing
+one name**, and the second one is wired backwards.
+
+Both live consult sites gate on the flag being **True**:
+
+```
+virtual_trader.py:2149   if EXIT_ADVISOR_HOURLY and EXIT_ADVISOR_DRYRUN:          # 8 of 9 verdicts
+main.py:3444             if EXIT_ADVISOR_ON_15M_CONFIRM and EXIT_ADVISOR_DRYRUN:  # 1 of 9 verdicts
+```
+
+**Setting `EXIT_ADVISOR_DRYRUN = False` deletes both consults.** No prompt, no verdict, no row, no
+close. The advisor would have gone **silent**, and the silence would have looked like activation.
+
+The **only** site where the flag behaves as its name promises is `main.py:2787`, the early return
+inside `_handle_5m_close_via_ai` — the one path with a close mechanic past it. That path is reached
+**only** by a 5m Group-B webhook, and:
+
+| | |
+|---|---|
+| `5m_group_b` rows in `trades`, all time | **0** |
+| `5m_group_b` rows since vpos 86 opened | **0** |
+| exit-advisor consults recorded, all time | 77 — **none** from this trigger |
+
+**The codebase already knew.** `config.py:232` says so, eight lines above the flag:
+*"its trigger is a 5m Group-B alert and **zero have ever arrived** — the operator has decided NOT to
+create a 5m exit alert, so this stays true."* That sentence was written to explain why the advisor
+never got consulted; nobody re-read it as a statement about where the advisor could **act**.
+
+**Net effect of the one-line flip, had it been applied:** the advisor stops speaking on the two
+triggers that work, and gains permission to close on a trigger that has never fired in the bot's
+history. **Strictly worse than DRYRUN — it forfeits the observation and buys no action.**
+
+**A second defect on the same path, found with it:** in LIVE mode `_handle_5m_close_via_ai` finds the
+position via `_fetch_open_position` (the exchange), so `_vpos` is `None` and it calls
+`claude_advisor.consult_for_close(...)` — **the old, unenriched consult with no book block at all**,
+not `consult_exit_advisor`. So the one close-capable path would also have been judging on a
+different, poorer prompt than the 77 verdicts §2.4 was built on.
+
+**THE CLASS, and it is the FOURTH instance in four days:** *the label does not say what the thing
+does.* §2.19 (percentile ranked on another book's scale), §2.20 (a no-op TIGHTEN recorded as
+terminal), §2.22 (three card labels), and now a flag whose name describes one of its two effects.
+**The `957f980` lesson was "check not only what the gate DECIDES but what it SAYS." This is the
+inverse and it is worse: the flag says the right thing and DOES a second, unnamed thing.**
+
+**Guard shipped with the fix:** the two consult gates now read `EXIT_ADVISOR_HOURLY` /
+`EXIT_ADVISOR_ON_15M_CONFIRM` alone — the flags they are named for — and `EXIT_ADVISOR_DRYRUN` is
+read **only** where a verdict is acted on. The log prefix `[EXIT-ADVISOR-DRYRUN]` becomes
+`[EXIT-ADVISOR-LIVE]` when it can act, so the journal cannot claim DRYRUN next to a real close.
+
+**Known label debt, recorded rather than fixed:** the DB status stays `exit_ai_dryrun` even when
+acting. Renaming it would fork the 77-row audit trail that §2.4 is cut from. Acted-on verdicts are
+identifiable by `virtual_positions.close_reason='ai_exit'`; the status column is the verdict channel,
+not a claim about acting. **Revisit if a second consumer ever reads that string as "did not act".**
+
 ## 3. WATCH-LIST — CURRENT REALITY
 
 **Retired** (deleted `d12e276` — they answered their question or their question died):
@@ -999,6 +1127,14 @@ recorded that way on purpose.
 **Re-verified from runtime at 03:15, not copied forward from the 19:30 block.** See §9 for why that
 sentence is now a rule.
 
+🔴 **RE-VERIFIED AGAIN AT 2026-07-30 11:10 UTC, whole block, against runtime — nothing below is
+copied forward.** Unchanged: `git status` clean · origin in sync · HEAD `957f980` · `titan.service`
+active since 02:51:11, `NRestarts=0`, **0 errors / 0 tracebacks / 0 CRITICAL / 0 `REFUSING TO
+START`**, breaker never tripped · runtime **= commit by HASH, 8/8 MATCH** (no `.py` newer than the
+process start) · four boot gates green in the live journal · **Mercury-SOL untouched, active** ·
+exchange **and** raw `swapV2` both report exactly 1 position and 1 order, ids unchanged, no orphans ·
+balance `free 481.30 · used 29.30 · total 510.60`. Changed: the position's P&L only (row below).
+
 `git status` **clean** · origin **in sync** (`main...origin/main`, 0 ahead 0 behind) ·
 HEAD **`957f980`** · `titan.service` **active**, restarted **2026-07-30 02:51:11**, `NRestarts=0`,
 **0 errors / 0 tracebacks / 0 CRITICAL**, **0 `REFUSING TO START`**, breaker never tripped ·
@@ -1027,7 +1163,8 @@ rather than a flat book (previously `0 exchange position(s), 0 open row(s)`).
 | exchange position | `positionId 2082629807737368578`, avgPrice 63686.0, amt 0.0023, SHORT |
 | both probes agree | unified `fetch_positions` **and** raw `swapV2` — 1 position, 1 order, no orphans |
 | at 03:15 | mark ~64159 · uPnL ~**−$1.09** · **−0.44R** · stop **+0.56R away** |
-| trail | **NOT ARMED** (arms at +1R = 62604.9) · breakeven not applied |
+| 🔴 **at 11:10** | mark **64600.0** · uPnL **−$2.10** · **−0.845R** · stop **+0.155R away (167 pts)** |
+| trail | **NOT ARMED** (arms at +1R = 62604.9) · breakeven not applied · MFE never exceeded **+0.099R** |
 | `recheck_status` | **`tightened`** — terminal, deliberately NOT resumed (§2.20) |
 
 **The stop order id is UNCHANGED across the 02:51 restart** — not cancelled, not re-placed.
@@ -1045,7 +1182,7 @@ rather than a flat book (previously `0 exchange position(s), 0 open row(s)`).
 | `PAPER_FIXED_MARGIN_USDT` | 2000.0 ($10,000 notional — historical book) |
 | `LIVE_FIXED_MARGIN_USDT` | **30.0** ($150 notional) |
 | `FIXED_MARGIN_USDT` | 2000.0 — **dead in live**, reachable only from the unreachable legacy path |
-| `EXIT_ADVISOR_DRYRUN` | **True — the advisor CANNOT close a position** |
+| `EXIT_ADVISOR_DRYRUN` | **True — the advisor CANNOT close a position.** Patch to `False` PREPARED, **NOT APPLIED**, awaiting approval — and it is **not** a one-line flip, see §2.23 |
 | `EXIT_ADVISOR_HOURLY` | True |
 | `WALL_TRAIL_LIVE_ENABLED` | False |
 | `MAX_POSITIONS_PER_SIDE` | 1 |
