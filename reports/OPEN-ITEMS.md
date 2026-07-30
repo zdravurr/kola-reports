@@ -163,6 +163,21 @@ Four filters. Most of the wrong conclusions killed in §4 came from skipping one
 | Wall-trail window | Outcome decided by a **moved stop**, not by the entry | `NOT (opened_at < '2026-07-13T01:55' AND closed_at > '2026-07-02T23:28')` |
 | Recheck TIGHTEN | Same — stop was moved after entry | `COALESCE(recheck_status,'') <> 'tightened'` |
 | Excursion truth | `max_adverse_price` **stops updating at the close**, so it understates what price did | use real OHLCV candles, not stored extrema |
+| 🔴 **Indicator WINDOW, not just algorithm** | The same `compute_tf_metrics` on a different candle limit is **not the same measurement**. ADX(14) is doubly Wilder-smoothed and ran **+6.23 mean high** on 42 bars vs 200 (§2.26). ATR/trend/EMA-gap are window-stable; **ADX is not** | any ADX must carry its window — `adx_window = 200` / `entry_adx_1h_window = 200`. Never compare two ADX figures whose windows differ or are unrecorded |
+
+### 🔴 STANDING METHODOLOGY — VALIDATE THE REPLAY BEFORE YOU TRUST IT (operator, 2026-07-30)
+**Confirmed as the pattern for ANY future rule change, not just this one.** Before a replay is used to
+predict what a corrected rule *would* do, it must first **reproduce what the rule ACTUALLY did** from
+the stored inputs — exactly, row for row. Only then is the corrected input swapped in.
+
+The §2.26a replay did this: re-scoring all 38 `recheck_events` rows from their own stored
+`entry_adx` / `adx_1h` / `atr_pct` / prices reproduced the **stored** `health_score` on **38 of 38**
+rows before the 200-bar ADX was substituted. That step is what separates "the replay says 9 verdicts
+flip" from "my re-implementation of the rules disagrees with the bot and I cannot tell which".
+
+**Why this is a standing rule and not a nicety:** §4's items 3, 9 and 10 are three confident wrong
+numbers, and every one came from a re-derivation nobody checked against the real thing first. A replay
+that cannot reproduce the past has no standing to predict the future.
 
 ⚠️ The wall-trail filter must test **lifetime overlap**, not entry time. Using entry time alone
 silently drops vpos 62. This exact bug produced a wrong answer once already.
@@ -430,10 +445,13 @@ So the rule is now:
 - 🔴 **If a defect is found DURING the window: finish the window and record the caveat. Do not
   reset.** The result is then reported with the defect stated alongside it, and the operator decides
   what the caveat is worth. A noted caveat on a completed window beats a third empty restart.
-- **Freeze scope, stated precisely so it cannot be lawyered:** frozen = everything the advisor READS.
-  Not frozen = what is done with the verdict (act/hold plumbing), logging, labels, the close
-  mechanics, or anything on the ENTRY side. Fixing a *close mechanic* does not void the window;
-  changing a *number the advisor sees* does.
+- **Freeze scope — ✅ EXPLICITLY CONFIRMED BY THE OPERATOR 2026-07-30 14:0x, SETTLED, do not
+  re-open the definition:** frozen = **everything the advisor READS**. **NOT** frozen = act/hold
+  plumbing, logging, labels, close mechanics, and **the entire entry side**. *Fixing a close mechanic
+  does not void the window; changing a number the advisor sees does.*
+- 🔴 **THE WINDOW IS OPEN.** It opened with the ADX-window fix commit (§2.26a) — applying that patch
+  is the act that started this clock. From that commit forward, any change to a figure rendered into
+  the close prompt requires **voiding and restating the window in this file, in the same commit**.
 
 **3 · Record the nine verdicts as an OPERATIONAL fact with their arithmetic — see §2.4b.** Not
 admissible for §2.4, and it is still the strongest signal we have about the advisor; it must not
@@ -1181,9 +1199,10 @@ would have scored **−5 → TIGHTEN**. The three `Health 0 / verdict OK` readin
 that is also why §2.20's no-op-TIGHTEN fix is still UNEXERCISED in live** (11 of 14 positions with
 recheck rows already ran all three tiers; only vpos 74 and 86 ever stopped at T+10, both on a TIGHTEN).
 
-#### 2.26a ✅ FIX WRITTEN AND VERIFIED — **NOT APPLIED. AWAITING THE OPERATOR** (2026-07-30 13:40)
-Patch prepared in a scratch tree; `/root/titan-bot` is **byte-identical to HEAD `81875c9`** and the
-service still runs the old code. **4 files, +404 / −40.** Two halves:
+#### 2.26a ✅ **APPLIED, COMMITTED `1161802`, LIVE 2026-07-30 14:11:12 UTC** (approved by the operator)
+Snapshot `/root/backups/pre-adx-window-fix-20260730-140811/` (4 sources + `config.py` + `trades.db`).
+**4 files, +441 / −40** — the extra 37 lines over the reviewed +404 are the `sensor_events` migration
+fix found during the pre-restart audit (§2.34), applied in the same commit. Two halves:
 
 **A · ONE WINDOW FOR ONE INDICATOR.** New `indicators.ADX_CANDLE_LIMIT = CANDLE_LIMIT` (by *identity*,
 so the entry reference and every later reading are one measurement rather than two literals kept in
@@ -1242,6 +1261,40 @@ values genuinely *were* 200-bar (`fetch_snapshot` is their only producer and `CA
 backfill would be **correct**. It is **NOT done anyway**: asserting provenance from a code invariant
 is the habit that produced this defect, and the measured cost of refusing is **zero verdicts across
 all 38 rows**. Legacy rows lose a rule that has never once fired.
+
+#### 2.26c ✅ THE OPEN POSITION — what the patch can and CANNOT reach (traced, not asserted)
+Asked by the operator before approval. **The patch cannot alter any MECHANICAL management of a
+position that is already running.** Proven by reachability rather than by claim:
+
+| patch site | reachable for the OPEN vpos 87? | why |
+|---|---|---|
+| `indicators.py` | **NO effect on any existing reader** | two hunks only: the `typing` import, and a **pure insertion** (+163/−0). `compute_tf_metrics`, `_fetch_ohlcv_cached` and `fetch_snapshot` are **byte-identical**, so the entry snapshot, the optimizer and the entry advisor see exactly what they saw before |
+| `execute_entry` (entry-ADX normalisation + INSERT) | **NO** | runs once, at entry. vpos 87 is already open |
+| schema ALTERs (3 columns) | additive, nullable | no row modified |
+| `_recheck_fetch_1h_metrics` · `_health_score` · `_run_recheck_tier` | 🔴 **NO — UNREACHABLE FOR LIFE** | `virtual_trader.py:2271-2273` skips the whole recheck block when `recheck_status IN ('done','tightened','closed_critical')`. vpos 87 is **`done`** (all three tiers ran, 12:05:30 / 12:06:24 / 12:10:28). The corrected floor **cannot fire retroactively**, and the patch does not touch that guard — no diff hunk lands within ~200 lines of it |
+| `sensor_events.log_recheck` | **NO** | its only caller is `_run_recheck_tier`, unreachable above |
+| stop price · breakeven · trail · LONG partial · emergency close | **NOT TOUCHED AT ALL** | no hunk in any of those paths |
+
+**⚠️ TWO things DO reach it, and "only the additive NOTE" would be wrong — correcting the framing:**
+
+1. **The NOTE in the exit prompt** — immediately, because vpos 87's latest sampler row (245, 13:05:31)
+   predates the fix and so has `adx_window` NULL. The prompt will refuse the entry-vs-now ADX
+   comparison in words until the next hourly sample.
+2. 🔴 **The ADX FIGURES THEMSELVES change**, from the first post-fix sampler row onward:
+   `_tf_metrics_safe` is reached by the hourly smart-exit sampler for **any** open position, so
+   `Now: ADX1h=… ADX15m=…` becomes the converged reading (~15.1 instead of ~22.3 on 1h) and the NOTE
+   then disappears because the two sides finally match. **That is the fix working, not a side effect** —
+   but it means the patch does change an input the advisor reads on a running position.
+
+**AND THE HONEST CONSEQUENCE OF THAT, since `EXIT_ADVISOR_DRYRUN = False`:** a different verdict on
+vpos 87 is possible, and a `close` verdict closes it. **Direction of the change is toward LESS spurious
+confidence in holding:** the advisor was being shown a fabricated ADX *rise* (13.5 → 22.3) and read it
+as *"regime strengthened"* — a reason to hold a LONG. With the truth (13.5 → ~15.1) that support is
+gone. The sampler itself drives no exit: `armed` / `would_exit` are computed from price only, and the
+table is read by no exit logic.
+
+**Nothing else in the position's contract moves.** Same stop, same 1R, same breakeven level, same
+trail, same partial.
 
 #### 2.26b 🔴 CONTAMINATION LEDGER — every ADX these tables hold before the fix is SUSPECT
 **Mark, do not re-run.** Nothing is re-analysed here; this exists so no future cut is done in
@@ -1431,6 +1484,78 @@ Outcome cut is under-powered both ways (ADX1h<20: n=2, −0.05R · ≥20: n=14, 
 Separately, on vpos 87 the entry advisor cited depth (82nd pct) and the ask wall (77th pct) and was
 **silent on `Imbalance 0.42 ask-heavy — 5th pct`, the most extreme figure in the block and against the
 LONG.** A selective read of a correct prompt. Worth watching alongside §2.8 and §2.19's n=1 note.
+
+### 2.33 🔴 LANDMINE — `virtual_trader`'s IMPORT MIGRATES THE PRODUCTION SCHEMA
+**Opened 2026-07-30 because it FIRED THAT DAY, on read-only work.** Recorded so the next person does
+not have to discover it the way this session did.
+
+`virtual_trader.py` calls **`init_db()` at module scope (line 2641)**. So *merely importing the
+module* — with no function called, no position touched, no intent to write anything — executes every
+`CREATE TABLE IF NOT EXISTS` and every additive `ALTER TABLE` in it, against
+**`DB_PATH = '/root/titan-bot/trades.db'`, the live production database, hardcoded.**
+
+**What happened:** a scratch copy of the module was imported to run a *guard truth table* — pure
+logic, no exchange, no DB intent. The import added two columns to the LIVE database hours before the
+patch that introduces them was approved:
+
+```
+virtual_positions.entry_adx_1h_window   INTEGER   (col 41)
+smart_exit_dryrun_samples.adx_window    INTEGER   (col 49)
+```
+
+**Assessed at the time, no harm:** additive nullable columns are a metadata-only change in SQLite; no
+row was modified; every INSERT into both tables names its columns explicitly
+(`virtual_trader.py:895`, `:2027`); no code reads either table positionally; the service stayed
+active with `NRestarts=0` and zero errors; the open live position read normally. **The columns were
+then adopted by the approved patch, so nothing had to be undone.** Dropping a SQLite column needs a
+table rebuild, which would have been a far larger intervention than the accident.
+
+🔴 **THE HAZARD IS GENERAL, AND THIS PROJECT DOES THIS KIND OF WORK CONSTANTLY.** Every forensic
+session imports `virtual_trader` (and `main`, which imports it) to read state, replay logic, or test a
+guard. **Every one of those imports migrates the production schema.** It is silent, it is not logged,
+and it happens before the first line of the analyst's own code runs.
+
+**MITIGATION FOR ANY FUTURE SCRATCH WORK — do this, it is cheap:**
+1. Copy `trades.db` to scratch and **repoint `DB_PATH` before importing**, or
+2. import into a process whose `DB_PATH` you have already patched via `sys.modules` shimming, or
+3. simplest and what should have been done here: **test pure logic against a copy of the file, not
+   against the module in place.**
+
+🔴 **NOT RESTRUCTURED, and that is the operator's decision, recorded as such:** moving `init_db()`
+out of module scope is a change to a **live trading module for a non-trading reason**. The class of
+defect this project keeps paying for is exactly that — touching working trading code to serve a
+convenience. **So the landmine stays armed and documented rather than defused.** If it is ever
+defused, it should be in a commit whose only purpose is that, with the boot path re-verified.
+
+### 2.34 ✅ FOUND IN THE PRE-RESTART AUDIT AND FIXED IN THE SAME COMMIT (`1161802`) — `sensor_events.init_db()` HAD NO CALLER
+**The second migration door, and this one was shut.** Grepped across every module: `init_db()` in
+`sensor_events.py` appears **only as its own `def`**. Nothing calls it — not `main`, not
+`virtual_trader`, not `breakeven_worker`. `recheck_events` and `adaptive_trail_events` exist because
+something created them once, long ago, so the `CREATE TABLE IF NOT EXISTS` statements have never been
+needed since — **and nobody noticed that the migration door was closed.**
+
+**Harmless while the schema never changed. NOT harmless the moment this module gained an additive
+`ALTER`:** the new `recheck_events.adx_window` column would never have been created, the first
+`log_recheck` INSERT would have raised `no such column`, and the module's own **two-layer
+try/except would have SWALLOWED it** — losing **every recheck evidence row, silently**, while the
+journal printed a perfectly normal `RECHECK` line. **Same shape as §2.6: code that READS as armed and
+is not.** Caught by auditing the migration path before the restart, not after.
+
+**FIXED in `1161802`:** a one-shot `_ensure_schema()` at the top of **both** public writers — the
+pattern `post_exit_observatory._ensure_db()` already uses. Idempotent (`CREATE IF NOT EXISTS` +
+guarded `ALTER`), once per process, and it cannot raise into the caller. Verified end-to-end on a copy
+of `trades.db`: column absent → `log_recheck` called → **column created and the row written**, with
+`adx_1h = 13.83` (converged), `adx_window = 200`, and `adx_delta = None` (correctly REFUSED, because
+the entry-side window was unrecorded).
+
+**This also closes a hazard that PREDATES the ALTER:** if `trades.db` were ever recreated or restored
+from a copy without those tables, every sensor write would have failed the same silent way.
+
+⚠️ **CONSEQUENCE TO EXPECT, stated so it is not read as a failure:** because the migration is now
+**lazy**, `recheck_events.adx_window` **does not exist on the live DB yet** — it is created the first
+time `log_recheck` runs, and the open vpos 87 can never trigger a recheck (`recheck_status='done'`, see
+§2.26c). **The column will appear on the NEXT position's T+10s recheck.** A query for it before then
+correctly errors with `no such column`; that is the design, not a fault.
 
 ## 3. WATCH-LIST — CURRENT REALITY
 
