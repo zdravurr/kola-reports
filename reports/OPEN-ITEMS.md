@@ -719,6 +719,12 @@ explain away a result. **The bar does not move and the count does not restart.**
 3. **ONE HELD BRANCH IS UNRESOLVED.** vpos 90's counterfactual never terminated — it is marked to
    market at 2026-08-01 12:25 (+0.291R for the advisor), not resolved by stop or trail. **One of the
    four datapoints can still change sign.**
+5. 🔴 **FROM `3316e8a` THE SAMPLE IS FILTERED — see §2.37a.** The loss-streak brake is live and
+   blocks entries after three consecutive losses, so the remaining ~6 datapoints are drawn from a
+   differently-selected population than the first four. Had it been live already it would have
+   blocked **vpos 89 (+2.30) and vpos 90 (−0.61)**. This does **not** void the window (§2.4-OP: the
+   entire entry side is not frozen) but the final result must carry it on its face.
+
 4. **THE HELD BRANCHES ARE MUTUALLY EXCLUSIVE** (`MAX_POSITIONS_PER_SIDE = 1`). Holding vpos 88 to its
    trail exit at 07-31 17:50 means **vpos 89 and 90 could never have opened**. The per-position
    arithmetic §2.4 asks for is correct as stated; it is **not** a portfolio result and must not be
@@ -1825,6 +1831,115 @@ than the position they replaced, the mechanism above is the thing to change — 
 close: **0 of 4 within 5 min · 1 of 4 within 15 min · 1 of 4 within 60 min.** The other gaps were
 104.7 min and 448.5 min, and after vpos 90 the entry path produced **nothing for 20 hours**. Do not
 quote the 10-minute case as a rate.
+
+### 2.37 🔴 DECISION — `LOSS_STREAK_THRESHOLD` STAYS AT **3**. Recorded WITH the reasoning (operator, 2026-08-01)
+**Written down so it cannot be revisited later as a rationalisation.** The brake was found dead
+(§2.35), its 30-day backtest showed it would have blocked **2 of 5 live entries including vpos 89, the
+only winner in the §2.4 sample (+2.30)**, and the threshold was **left alone anyway.** The reasons, in
+the operator's terms:
+
+1. **Softening a brake because it blocked one winner is OUTCOME-FITTING ON n=1** — the exact failure
+   mode that has killed eleven hypotheses in §4. The evidence for "3 is too tight" is a single trade
+   that happened to work.
+2. **It is not a money mechanism.** Three consecutive losses mean *something is systematically off*,
+   and that is equally true whether they cost **$4 or $400**. A count-based brake is supposed to be
+   size-blind; that is the feature, not the bug.
+3. **The 7.2% figure is CONTAMINATED and we do not actually know the live rate.** The 30-day window
+   spans a **68× notional change** ($10,000 → $146), and the two 07-31 windows mix a **−137.32** loss
+   with **−2.54** and **−0.82**. A rate measured across that discontinuity predicts nothing.
+4. **A safety mechanism found dead after 2.5 months must not have "make it fire less" as its first
+   treatment.** Restore it, measure it at one size, *then* discuss calibration.
+
+**What would reopen this:** a measured live-size firing rate (duty below), not a single blocked
+winner. **Nothing about this decision is provisional pending the §2.4 result** — if the advisor's
+window comes back positive, that is not evidence about the streak brake.
+
+### 2.37a 🔴 §2.4 CONFOUND — THE LOSS-STREAK BRAKE NOW SHAPES THE REMAINING ~6 DATAPOINTS
+**Stated NOW, before any result exists, so it cannot be discovered afterwards.** From `3316e8a` the
+brake is live and blocks entries after three consecutive losses. **The positions the advisor gets to
+close from here are therefore a SELECTED SET** — specifically, entries that would have followed a
+losing streak are removed from the sample.
+
+**Had it been live over the four closes already recorded, it would have blocked vpos 89 (+2.30) and
+vpos 90 (−0.61)** — i.e. it would have removed the sample's best and one of its worst, and §2.4 would
+today read n=2 with a different net.
+
+🔴 **This does NOT void the window.** §2.4-OP is explicit that the **entire entry side is NOT frozen**;
+only what the advisor READS is. The count stays **4 of ~10** and the bar does not move. But the
+remaining datapoints are drawn from a differently-filtered population than the first four, and **the
+result must be reported with that stated on its face.**
+
+### 2.37b 🔴 MEASUREMENT DUTY — THE BRAKE'S *LIVE* FIRING RATE, REPORTED WITH THE §2.4 RESULT
+The 30-day rate (13 windows · 52.0 h · 7.22% of wall-clock · 5 entries blocked) is **NOT predictive**:
+it spans the 68× size change (§2.37·3). **The number that matters does not exist yet.**
+
+**To be measured over the §2.4 window, at live size only, and reported ALONGSIDE the window's result —
+not separately, and not on request:**
+
+| quantity | how |
+|---|---|
+| halts fired | count of distinct loss-streak halt windows since `3316e8a` |
+| hours halted | summed window duration, and as a % of the §2.4 window's wall-clock |
+| entries blocked | signals that reached `check_risk` and were refused with `loss-streak halt` |
+| what those entries would have been | side, tier set, and — where recoverable — the outcome of the position that did *not* open |
+
+**Until that table exists, no statement about this brake's cost or benefit is supportable in either
+direction.**
+
+### 2.37c 🔴 PRECONDITION TO ANY SIZE INCREASE — the daily-loss brake is ARMED BUT DORMANT at $146
+`daily_loss_halt()` works again (§2.35) but **cannot bite at the current size**: −5% of the $510.41
+balance is **−$25.52**, and at the live 1R (mean **$1.96** over vpos 86–90) that needs **~13 full-stop
+losses inside one UTC day**. Observed live-era troughs: **−0.50%** and **−0.26%**.
+
+**It becomes a real constraint the moment size increases** — and the same increase is what makes it
+necessary. In the old-size book it would have fired on **12 of 18 trading days**, worst
+**2026-07-29 at −51.81% of equity in a single day**, ten times its own limit, while blind.
+
+🔴 **THEREFORE, ADDED TO THE SIZE-INCREASE CHECKLIST alongside §1b (margin mode CROSSED):** before any
+notional increase, **re-derive `DAILY_LOSS_PCT_LIMIT` against the NEW 1R** and state how many
+stop-outs it then represents. A limit that means "13 stops" at one size and "1.5 stops" at another is
+not the same limit, and discovering that after the increase is the wrong order.
+
+### 2.38 👁 WATCH, NO ACTION — THE 20-HOUR DROUGHT IS **NOT** THE 3.0 BAR. Measured 2026-08-01
+**The bar is exonerated on its own pre-registered terms, and the drought has two other causes.**
+Reconstruction validated first per §0: rebuilding the gate number from `matrix_breakdown_json`
+reproduced the stored `confluence_score` on **40 of 40** `below_threshold` rows since the bar went
+live, **0 mismatches**, before anything below was computed.
+
+| | predicted (§2.0 pre-registration) | **observed, whole life of the bar (~38.9 h)** |
+|---|---:|---:|
+| refusal rate on TREND signals reaching the score gate | 15.72% | **11.76% — 2 of 17** |
+| additional refusals per day from the 2.0 → 3.0 raise | ≈2.2/day | 🔴 **0.00/day — ZERO, total** |
+
+🔴 **THE RAISE HAS COST EXACTLY ZERO ENTRIES.** Both TREND signals the bar refused scored **1.5**
+(raw 2.5, macro −1.0) — **below the OLD 2.0 bar as well.** Not one signal has landed in the
+2.0–3.0 band that the raise created.
+
+**What is actually causing the drought — two things, neither of them the bar:**
+
+| period | entry rows | HTF-blocked | reached gate | TREND | FLAT | %FLAT | executed |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| 30d before the bar | 5609 | 4084 (72.8%) | 1524 | 630 | 894 | 58.7% | 26 |
+| 7d before the bar | 1221 | 902 (73.9%) | 319 | 169 | 150 | 47.0% | 7 |
+| **last 24h** | 196 | **162 (82.7%)** | 34 | **4** | 30 | **88.2%** | 1 |
+
+1. **The HTF cascade, not the score gate, is where the funnel closes** — and it tightened from
+   ~73% to **82.7%**. It runs **in front of** the score gate (`main.py:3679`), so 162 of 196 signals
+   never reached the bar at all.
+2. **The regime composition collapsed toward FLAT** — **88.2%** of gate-reaching signals in the last
+   24 h, against 58.7% over the prior 30 days. **Only 4 TREND signals reached the gate in 24 hours,
+   against a 30-day average of ~21/day.** In FLAT the governing bar is `CONFLUENCE_FLAT_THRESHOLD`
+   = **5.0**, deliberately unchanged on 2026-07-30, and it refused **26 of 30** FLAT signals (86.7%).
+
+**So the 3.0 bar barely got to vote.** Reported early, per the pre-registration's own instruction —
+and per its other instruction, **this is a finding about the distribution and NOT a reason to move any
+bar.** The 15-entry review still stands and its denominator is still 15 executed entries.
+
+⚠️ **METHOD NOTE, §0's trap avoided:** `confluence_score` holds THREE different quantities by status.
+The validation above is on `below_threshold` rows only, which is the one cohort where it equals the
+gated score. `risk_halt` row 20103 is **excluded from every gated-score figure**: its
+`macro_gate_penalty` is **NULL**, so its gate number is **not computable** — it is counted as having
+reached and passed the gate, and no score is asserted for it.
 
 ## 3. WATCH-LIST — CURRENT REALITY
 
