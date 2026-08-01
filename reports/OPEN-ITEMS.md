@@ -700,6 +700,30 @@ been **+23.61 gross vs the actual −135.80** — an improvement of ~159 USDT. R
 1, worsened 0, neutral 1.** Eight more closes needed; the bar does not move.
 Currently `EXIT_ADVISOR_DRYRUN = True`: it can never close a position.
 
+#### 🔴 CAVEATS RECORDED 2026-08-01 AT n=4 — CAVEATS, **NOT** REASONS TO RESET (§2.4-OP·3)
+Recorded while the window is OPEN and before it completes, so none of them can be introduced later to
+explain away a result. **The bar does not move and the count does not restart.**
+
+1. **FEES EXCEED THE SAMPLE'S REALISED P&L.** Four advisor round trips paid **0.5849 USDT** in fees
+   against a total realised **+0.3423**. Mean **0.1462 per round trip** on ~$146 notional = **~0.08R
+   burned per decision** before the advisor's judgement is worth anything. The counterfactual in §2.4
+   is computed net of fees on both branches, so this does not bias it — but any reading of "the
+   advisor is roughly break-even" must state that it is break-even **after** paying 1.7× its own
+   P&L in fees.
+2. **NO CLOSING THRESHOLD CAN BE READ FROM THIS DISTRIBUTION.** The closes cluster at unrealised
+   −0.36 / −0.22 / +1.50 / −0.26 R, which looks like a threshold near −0.3R. It is not readable as
+   one: **the deepest adverse reading ever shown to the advisor across all 27 consults is −0.36R**,
+   and 25 of 27 land within ±0.4R of flat. There is **no consult at −0.5R, −0.7R or −0.9R that it
+   held through**, so "it closes at about −0.3R" cannot be separated from "−0.3R is the worst it has
+   ever been asked about." A distribution with no tail cannot yield a threshold.
+3. **ONE HELD BRANCH IS UNRESOLVED.** vpos 90's counterfactual never terminated — it is marked to
+   market at 2026-08-01 12:25 (+0.291R for the advisor), not resolved by stop or trail. **One of the
+   four datapoints can still change sign.**
+4. **THE HELD BRANCHES ARE MUTUALLY EXCLUSIVE** (`MAX_POSITIONS_PER_SIDE = 1`). Holding vpos 88 to its
+   trail exit at 07-31 17:50 means **vpos 89 and 90 could never have opened**. The per-position
+   arithmetic §2.4 asks for is correct as stated; it is **not** a portfolio result and must not be
+   read as one.
+
 ### 2.4a vpos 86 — exit-advisor verdicts logged AS THEY HAPPEN (live, DRYRUN-blocked)
 Recorded now rather than reconstructed later, so the datapoints exist whichever way the trade goes.
 SHORT 0.0023 BTC @ 63686.0, opened 2026-07-30 00:50:14, 1R = 1081.1 pts, stop 64767.1 on the
@@ -1720,6 +1744,87 @@ from a copy without those tables, every sensor write would have failed the same 
 time `log_recheck` runs, and the open vpos 87 can never trigger a recheck (`recheck_status='done'`, see
 §2.26c). **The column will appear on the NEXT position's T+10s recheck.** A query for it before then
 correctly errors with `no such column`; that is the design, not a fault.
+
+### 2.35 ✅ BOTH PORTFOLIO MONEY-BRAKES WERE INERT FOR 2.5 MONTHS — FIXED (2026-08-01)
+**`risk_manager.loss_streak_halt()` and `daily_loss_halt()` could not halt anything, and had not been
+able to since 2026-05-11.** Not a threshold that was never reached — a query that could never return
+rows.
+
+Both read `trades` rows whose `signal_type` was in a hardcoded tuple
+`('5m_group_b','close_long','close_short','exit_long','exit_short')`. That tuple encodes an
+assumption that stopped being true: **that a close writes its own row.** It does not. Every close
+route propagates P&L back onto the **ENTRY** row, whose `signal_type` is `open_long` / `open_short`.
+
+🔴 **The entire database contains ONE row matching that tuple: id 186, `close_long`,
+2026-05-11 21:18:16.** So `loss_streak_halt()` hit `len(rows) < LOSS_STREAK_THRESHOLD` (1 < 3) and
+returned `'1/3 closes recorded'` on **every call for 2.5 months**, and `daily_realized_pnl()` returned
+**0.0** on every call, sending `daily_loss_halt()` down its `pnl >= 0` branch forever.
+
+**The tell that was there all along, in the code's own comment:** *"we filter on these ... because the
+AI close path **also** propagates pnl back to the entry row, and we don't want to double-count."* The
+author knew the entry row carries the P&L and excluded it — correctly, **if** a close row also
+existed. When close rows stopped being written, the exclusion became the whole set.
+
+**FIXED — the source is now `virtual_positions(status='closed').net_pnl`**, with the coverage proven
+rather than assumed:
+- **Route-agnostic by construction.** The predicate is `status='closed' AND closed_at IS NOT NULL AND
+  net_pnl IS NOT NULL` and names **no route**. Present today: `sl`(28) `trail`(15) `external`(10)
+  `ai_exit`(4) `post_entry_critical`(1). **`breakeven` is a fifth defined route with 0 rows so far and
+  needs no code change to be counted.** Enumerating routes is the defect; the fix must not repeat it.
+- **Partials are not double-counted.** `net_pnl` already CONTAINS any realised partial. Proven on
+  vpos 82, the only position that ever took one: gross 42.4633600 + partial 18.9070939 − fees
+  6.6849138 − funding 0.8929330 = **53.7926072 = net_pnl exactly**.
+- **Duplicate `trades` rows avoided.** Six `15m_armed_exit` rows carry pnl byte-identical to a
+  `virtual_positions` row (vpos 54/60/64/75/76/84). Reading ONE table is what avoids counting that
+  money twice — the old tuple would have needed a seventh member and still been wrong.
+- **Ordering is by `closed_at`, not `id`** (id is ENTRY order; a LONG opened earlier can close after a
+  SHORT opened later). ISO-8601 `+00:00` on 58 of 58 rows, so lexical order is chronological —
+  verified, not assumed.
+
+🔴 **THE GUARD, §2.19's shape (this is the 6th place).** The failure was a mechanism silently reading a
+set that could never populate **and reporting the miss in the same voice as a real pass** —
+`'1/3 closes recorded'` reads exactly like an evaluated threshold. `PnlWindow` now carries its own
+provenance with **no constructor defaults** (the required-positional half), and `blind` is a property
+of the DATA rather than a check a caller may forget (the WHERE-clause half). A blind brake prints
+`[TITAN][RISK-BLIND] 🔴 INSUFFICIENT DATA — <brake> CANNOT FIRE: n of N required closes visible in
+<source>. This is NOT "evaluated and passed".` **Three states now exist where there were two:
+halted · evaluated-and-passed · could-not-see.** Every reason string on every branch names the source
+and the row count.
+
+⚠️ **WHAT THE FIX DOES NOT DO: it does not retune anything.** `LOSS_STREAK_THRESHOLD=3`,
+`LOSS_STREAK_COOLDOWN_HOURS=4`, `DAILY_LOSS_PCT_LIMIT=0.05` are untouched. Calibration is a separate
+operator decision and is stated in the 2026-08-01 report with the 30-day firing rates.
+
+### 2.36 🔴 LIVE STRUCTURAL QUESTION — AN ADVISOR CLOSE DOES NOT REACH THE ENTRY PATH
+**Recorded as an open question, NOT acted on. No re-entry cooldown has been added, deliberately.**
+
+**The mechanism, named:** the exit advisor closes on a **15m/5m tier flip against the position**
+(4 of 4 closes cite it; 5 of 23 holds do). The entry cascade opens on **the same 15m/5m tiers**.
+Neither knows the other exists — an `ai_exit` close writes `close_reason` on the position row and
+nothing else. No cooldown, lockout, flag or signal suppression is keyed on it. So the same live tier
+set that the advisor just declared broken can re-admit immediately, and once it did:
+
+> vpos 89 closed **14:15:13** — *"15m/5m SHORT agreement dissolved—both now neutral"*.
+> vpos 90 opened **14:25:19**, **10.1 minutes later**, same side, on an **IDENTICAL tier set**
+> (1H Smart Trail Bearish 0.9 · 15m HyperWave Signal Down 0.7 · 5m Within Bearish OB 0.7), with the
+> **same 1H tier instance still live** (age 3.3 h → 5.4 h, matching the 2.1 h between entries).
+
+🔴 **WHY NOTHING WAS BUILT — operator's ruling, 2026-08-01, and it is the correct reading of the
+evidence:** *n = 1, and the direction is not even established.* **vpos 89 was the WINNER of the
+sample (+2.30) and vpos 90 was a loser (−0.61).** One observation cannot show that re-entry is
+costly; it is equally consistent with the entry path being right and the advisor's close being
+premature. Building a cooldown now would be **suppressing the very signal the §2.4 window exists to
+measure**, and it would do so before the measurement finishes.
+
+**What would close this:** the remaining ~6 §2.4 closes, with the post-close re-entry gap and the
+outcome of each re-entry recorded. If same-side re-entries inside ~15 min are systematically worse
+than the position they replaced, the mechanism above is the thing to change — and it is an
+**entry-side** change, so §2.4-OP does not forbid it mid-window.
+
+⚠️ **Counted correctly, this has happened ONCE in four closes.** Same-side re-entry after an advisor
+close: **0 of 4 within 5 min · 1 of 4 within 15 min · 1 of 4 within 60 min.** The other gaps were
+104.7 min and 448.5 min, and after vpos 90 the entry path produced **nothing for 20 hours**. Do not
+quote the 10-minute case as a rate.
 
 ## 3. WATCH-LIST — CURRENT REALITY
 
