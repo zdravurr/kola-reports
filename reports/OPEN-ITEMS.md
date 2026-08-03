@@ -51,7 +51,15 @@ understates realised live P&L by that amount. Any live-P&L total must add it bac
 
 The trail is deliberately still owned by the poller in live — see the ⚡ section below.
 
-_Last updated: **2026-08-03 14:00 UTC** — HEAD **`ca90c2f`**. §2.39 opened and CLOSED (the learning
+_Last updated: **2026-08-03 14:15 UTC** — HEAD **`a85733f`**. §2.40e opened and CLOSED — the entry
+prompt's combo weight now carries its **provenance** (evaluation count · date of the most recent ·
+the POSITION SIZE they were taken at, as a ratio); the verdict wording *"<1 = historical loser"* is
+gone, **the number is kept**, and no minimum-n or staleness rule was invented. Freeze checked and
+argued: §2.4-OP freezes the CLOSE prompt and is explicit the entry side is not frozen; no diff line
+touches a close-side symbol. §2.40f opened — 🔴 **the ±20/−15 thresholds and §2.41's re-grade are ONE
+decision with two levers and must be taken TOGETHER**: an inert mechanism makes the re-grade
+permanent, a live one makes it revisable. Both remain deferred.
+Earlier the same day: HEAD **`ca90c2f`**. §2.39 opened and CLOSED (the learning
 loop graded OPEN positions — 47 of 65; fixed, closure is now `pnl IS NOT NULL` in the WHERE clause).
 §2.39a: the three wrong grades CORRECTED in one asserted transaction, backup
 `trades.db.bak_gradefix_20260803`. §2.39b: every `learning_*` attribution before `ca90c2f` marked as
@@ -2129,6 +2137,72 @@ only.
 
 **NOT FIXED, ONLY MEASURED.** Re-scaling the thresholds is a strategy change, and it interacts
 directly with §2.41. **Nothing here proposes adopting the R-equivalents above.**
+
+### 2.40e ✅ THE INFLUENCE CHANNEL IS CLOSED (`a85733f`) — THE WEIGHT NOW CARRIES ITS PROVENANCE
+
+**The mechanism is still inert (§2.40 stands, unchanged). What is fixed is that the model is no
+longer told a one-trade paper judgement is established history.** Was:
+
+```
+Combo weight: 0.90 (1.0 baseline; <1 = historical loser, >1 = winner)
+```
+
+Now:
+
+```
+Combo weight: 0.90  (1.00 = untouched; -0.10 per evaluation that lost more than $15,
+  +0.10 per one that gained more than $20)
+  Based on: 1 evaluation, most recent 2026-06-03, taken at ~67x the current position size.
+```
+
+🔴 **THE NUMBER IS KEPT.** No suppression, **no minimum-n rule, no staleness cut-off** — deciding
+for the model that a 1-evaluation weight should be ignored is the same mistake in the other
+direction. **Facts, not judgements**, the same line drawn on the book block (*"CALIBRATION ONLY"*)
+and on the 1H tier identity (`f0a8d30`). The direction sentence is kept but stated **mechanically**
+— what moves the number — instead of as a character judgement about the combo.
+
+Four render shapes, all verified on real data: **never evaluated** (the common case — no store row —
+renders *"no evaluations yet — this is the untouched baseline"*); **single paper evaluation**
+(*"~67x"*); **live-era** (*"~0.97x"*); **mixed eras** (*"~0.99x-67x the current position size (mixed
+sizes)"* — an honest range, not a mean that hides the mix). A real lookup failure renders *"not
+available"* and is the **only** thing that does.
+
+Size ratio comes from `order_adapter.active_fixed_margin() × LEVERAGE`, **not** `FIXED_MARGIN_USDT`
+— that alias resolves to the PAPER size and would understate the ratio by ~67x in live.
+
+**FREEZE CHECK (§2.4-OP), argued not assumed:** §2.4-OP freezes *"everything the advisor READS"* on
+the **close** prompt and is explicit that **the entire entry side is NOT frozen**. The combo weight
+reaches `consult_for_entry` only; it appears **exactly once** in `claude_advisor.py`, and neither
+`_build_exit_context` nor the close template touches `signal_weights`. Verified: **no diff line
+touches any close-side symbol.** ⚠️ Second-order effect stated rather than hidden: future *entry*
+`ai_reason` text may read differently, and the exit prompt renders `Advisor's reason at entry` — but
+that is the same field reading the same column, not a change to a close-prompt input, and it is the
+property every entry-side change has (cf. §2.37a, §2.38).
+
+**Nothing else changed:** `get_weight` is byte-identical (**0** diff lines in its body), the gate is
+`direction_score + macro_gate_adj` with **no weight term**, and sizing is `FIXED_NOTIONAL_MODE` with
+`scaled_step_margin` still having **no callers**.
+
+### 2.40f 🔴 THE THRESHOLDS AND §2.41 ARE ONE DECISION — DO NOT TAKE THEM IN SEQUENCE BY ACCIDENT
+
+**Operator's ruling, 2026-08-03. Recorded so neither can be taken alone by a later session.**
+
+Adopting the R-equivalent constants from §2.40c would make the mechanism **live again** — and that
+**changes what §2.41's re-grade MEANS**:
+
+| | if the thresholds STAY at ±20/−15 | if they are re-scaled to the R-equivalents |
+|---|---|---|
+| the mechanism | **inert** — no weight can ever move at live size | **live** — weights move again |
+| what §2.41 would write | a **PERMANENT, unrevisable** value, carried into every future entry prompt | a **revisable** value that live evidence then corrects |
+| so §2.41 is | a final judgement derived from a paper era at 68× notional | an initialisation that the next few trades can overwrite |
+
+**The same re-grade is a different act depending on which threshold decision is in force.** Taking
+them in sequence — re-grade first, re-scale later, or the reverse — means the first decision is made
+under an assumption the second one invalidates.
+
+🔴 **BOTH REMAIN DEFERRED, AND THEY ARE TO BE DECIDED TOGETHER.** §2.41 stays deferred; §2.40's
+thresholds stay **recorded, not fixed**. Neither is housekeeping and neither is a prerequisite for
+the other — they are one decision with two levers.
 
 ### 2.41 🔴 DEFERRED, EXPLICITLY NOT HOUSEKEEPING — THE 44-ROW RE-GRADE WOULD SET A **PERMANENT** WEIGHT
 
