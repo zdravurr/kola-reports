@@ -51,7 +51,8 @@ understates realised live P&L by that amount. Any live-P&L total must add it bac
 
 The trail is deliberately still owned by the poller in live — see the ⚡ section below.
 
-_Last updated: **2026-08-03 14:35 UTC** — HEAD **`34dbdbf`**. §2.42 opened and CLOSED — the book sources moved to OKX-4000 for storage, learning and the recheck; new columns `advisor_book_json`, `entry_okx_wall_baseline_mult`, `entry_book_src`, `recheck_events.book_src`, NULL on all legacy rows, not backfilled; both prompts byte-identical (md5), **window NOT reset**. Includes the non-advisor entry-path finding (0 of 65 positions; one entry ever, 2026-05-11, predating the engine; unreachable by today's alerts but legacy-not-dead). **§2.42a opened — the POST-WINDOW LIST as one coupled block: ①§1d fallback both halves · ②§3 entry-reference drift · ③§2.40/§2.41 thresholds+re-grade · ④retire `entry_wall_baseline_mult` WITH ①.**
+_Last updated: **2026-08-03 14:50 UTC** — HEAD **`489e0ac`**. §2.43 opened and CLOSED — the legacy fall-through now REFUSES to enter (alert + log + status stamp, no order); **the close half is untouched deliberately** (refusing a close could strand a position); proven **structurally** (`_execute_entry` has no call site left in `webhook()`), **not** behaviourally — a live probe was stopped earlier by the HTF cascade and state was not manipulated to force it. Prompts byte-identical, window untouched.
+Earlier the same day: HEAD **`34dbdbf`**. §2.42 opened and CLOSED — the book sources moved to OKX-4000 for storage, learning and the recheck; new columns `advisor_book_json`, `entry_okx_wall_baseline_mult`, `entry_book_src`, `recheck_events.book_src`, NULL on all legacy rows, not backfilled; both prompts byte-identical (md5), **window NOT reset**. Includes the non-advisor entry-path finding (0 of 65 positions; one entry ever, 2026-05-11, predating the engine; unreachable by today's alerts but legacy-not-dead). **§2.42a opened — the POST-WINDOW LIST as one coupled block: ①§1d fallback both halves · ②§3 entry-reference drift · ③§2.40/§2.41 thresholds+re-grade · ④retire `entry_wall_baseline_mult` WITH ①.**
 Earlier the same day: HEAD **`a85733f`**. §2.40e opened and CLOSED — the entry
 prompt's combo weight now carries its **provenance** (evaluation count · date of the most recent ·
 the POSITION SIZE they were taken at, as a ratio); the verdict wording *"<1 = historical loser"* is
@@ -2280,6 +2281,38 @@ drop the writer; keep the data, recorded as historical BingX depth-100.
 
 **Ordering constraint:** ④ cannot precede ①; ① cannot precede the window closing. ② shares ①'s gate
 but is otherwise independent. ③ is independent of both.
+
+### 2.43 ✅ THE LEGACY FALL-THROUGH REFUSES TO ENTER (`489e0ac`) — AND WHAT IS **NOT** PROVEN
+
+**Applied 2026-08-03 14:48 UTC, LIVE, flat.** `webhook()`'s legacy entry branch no longer calls
+`_execute_entry`. It logs `[P3-ENTRY-REFUSED]`, Telegrams the operator with `task`/`action`/`tf`
+**verbatim** plus what to do (misconfigured alert **or** missing handler), stamps
+`status='unrecognised_payload_refused'`, and returns 200 without trading. It deliberately does **NOT**
+route the payload to the advisor — an unrecognised payload is exactly what we do not understand well
+enough to trade on.
+
+🔴 **THE CLOSE HALF IS UNTOUCHED, DELIBERATELY.** Same fall-through, but it already carries its own
+`orders_are_real()` guard, it has run once (trade 186, 2026-05-11), and **refusing a close could
+strand an open position — strictly less safe.** All 13 names the shared tail reads are
+pre-initialised above the `is_close` split, so the close path is byte-for-byte unchanged (AST-verified;
+`create_market_order` still reachable at 4476/4490).
+
+🔴 **PROVEN STRUCTURALLY, NOT BEHAVIOURALLY — SAID PLAINLY.** A live probe
+(`task='__guard_test__'`) **never reached the guard**: the **HTF cascade blocked it first**
+(`htf_blocked`, *"1H NEUTRAL (no active TREND signal)"*, row 21032, still flat, vpos count 65).
+Reaching the branch would have required setting a 1H TREND signal in a live bot's state machine —
+**not done, and not to be done.** What IS proven: **`_execute_entry` has no remaining call site in
+`webhook()`** (AST) — the route cannot place an order at all, which is stronger than one passing
+probe. Plus: no dangling `entry` read, no unbound name in the refusal branch, both prompts
+byte-identical (md5), four boot gates green.
+
+**Incidental finding, recorded:** the **HTF cascade is a second layer in front of this branch**, but
+it is conditional on **state-machine state**, not on the payload — with a 1H TREND signal live, the
+same unrecognised payload would have walked straight to the entry. It is protection, **not** a
+substitute for the guard.
+
+The old branch body was **DELETED, not left unreachable under the return** — dead code still reading
+`entry[...]` would NameError the moment anyone removed the return (the 2026-07-29 class).
 
 ## 3. WATCH-LIST — CURRENT REALITY
 
