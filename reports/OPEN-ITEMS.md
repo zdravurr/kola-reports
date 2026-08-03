@@ -51,7 +51,19 @@ understates realised live P&L by that amount. Any live-P&L total must add it bac
 
 The trail is deliberately still owned by the poller in live — see the ⚡ section below.
 
-_Last updated: **2026-07-30 03:15 UTC** — 🔴 header REBUILT after a regression (see §9): this file
+_Last updated: **2026-08-03 14:00 UTC** — HEAD **`ca90c2f`**. §2.39 opened and CLOSED (the learning
+loop graded OPEN positions — 47 of 65; fixed, closure is now `pnl IS NOT NULL` in the WHERE clause).
+§2.39a: the three wrong grades CORRECTED in one asserted transaction, backup
+`trades.db.bak_gradefix_20260803`. §2.39b: every `learning_*` attribution before `ca90c2f` marked as
+attributed-to-a-mark, left in place deliberately. **§2.40 opened — 🔴 the combo-weight mechanism is
+INERT at live size: ±20/−15 USDT against a 1R of $1.32–2.49 needs 8–15R, the loss side is
+unreachable while the stop holds, and the last weight to move did so 2026-07-20 in the PAPER era —
+yet the frozen table is still rendered into every entry prompt.** §2.41 opened — the 44-row re-grade
+DEFERRED, and §2.40 makes it weightier: an inert mechanism means any value written now is PERMANENT.
+§2.4 tally **4 → 5** (vpos 91's held branch terminated 08-03 13:52); §2.4 caveat 3 RETIRED — vpos
+90's held branch terminated 08-02 02:05, so no datapoint can still change sign.
+Earlier: **2026-08-01 13:40 UTC** — §2.37/a/b/c and §2.38 added.
+Earlier: **2026-07-30 03:15 UTC** — 🔴 header REBUILT after a regression (see §9): this file
 had forked at 2026-07-29 13:54 and the canonical copy still described Titan as a paper-mode bot
 while §2.19–§2.22 in the same file described real-money incidents with real BingX order IDs. Rebuilt from the 2026-07-29 20:30 snapshot, the
 true latest base. Tonight: §2.19/§2.20/§2.22 CLOSED (`625fedc`, `838481f`, `957f980`), §2.21 opened,
@@ -700,6 +712,38 @@ been **+23.61 gross vs the actual −135.80** — an improvement of ~159 USDT. R
 1, worsened 0, neutral 1.** Eight more closes needed; the bar does not move.
 Currently `EXIT_ADVISOR_DRYRUN = True`: it can never close a position.
 
+#### 🔴 TALLY — **n = 5 of ~10** as of 2026-08-03 14:00 UTC. FIVE MORE CLOSES NEEDED; THE BAR DOES NOT MOVE.
+
+Held branches replayed on real 5m BingX candles, **intrabar ambiguity resolved ADVERSELY to the held
+branch**, each seeded from the position's real state at the advisor's close.
+
+| vpos | side | held-branch outcome | advisor net | held net | **advisor − held** |
+|---|---|---|---:|---:|---:|
+| 87 | LONG | `sl` @ 64028.8, bar 07-31 07:05 | −0.8191 | −2.0110 | **+1.1919** |
+| 88 | SHORT | breakeven → `trail` @ 63192.2, bar 07-31 17:50 | −0.5311 | +0.8914 | **−1.4225** |
+| 89 | SHORT | `trail` @ 63171.3, bar 07-31 17:50 | +2.3024 | +1.0703 | **+1.2321** |
+| 90 | SHORT | `sl` @ 63491.9, bar 08-02 02:05 *(resolved 08-03)* | −0.6099 | −2.1541 | **+1.5442** |
+| **91** | SHORT | **`sl` @ 63224.6, bar 08-03 13:52** *(new)* | **−0.6410** | **−1.4682** | **+0.8272** |
+
+```
+NET n=5 : advisor -0.2987  vs  held -3.6716   ->  advisor +3.3729 USDT.  Improved 4, worsened 1.
+(n=4 was +2.5457 after vpos 90 resolved; +1.5852 when vpos 90 was still a mark)
+```
+
+**Datapoint 5 — vpos 91**, SHORT 0.0023 @ 62649.2, closed by the advisor **2026-08-03 13:41:09** at
+62871.4, `reason=ai_exit`, net **−0.6410**. Verdict verbatim: *"Entry thesis collapse: 15m was
+opposing at entry (HyperWave OS LONG vs SHORT trade); now 15m=bull, 5m=neutral with bullish
+structure… Regime shifted."* Held-branch seed: `sl 63224.6` (never moved), `breakeven_applied=false`,
+water mark 62268.6 = **+0.661R**, so the +1R arm at 62073.8 was never reached — no breakeven, no
+trail, the original stop stands. Held gross **−1.32342**, fees 0.144756 (entry 0.072047 + exit
+0.072709 @ 5.0 bps) → **held net −1.46818**, funding not ledgered (**biases toward the held branch**).
+
+⚠️ **Margin disclosed, because it was thin at first touch and thick eleven minutes later.** The 13:52
+1m bar cleared the stop by **+0.4 pts** (H 63225.0 vs 63224.6) on a **last-price** candle, while the
+real stop triggers on **MARK**. The rule resolves that — ambiguity goes against the held branch — but
+the datapoint does **not rest on it**: the 13:55 bar printed **H 63287.7**, clearing the stop by
+**63.1 pts**, and 13:56 by 8.8. **Unambiguous either way.**
+
 #### 🔴 CAVEATS RECORDED 2026-08-01 AT n=4 — CAVEATS, **NOT** REASONS TO RESET (§2.4-OP·3)
 Recorded while the window is OPEN and before it completes, so none of them can be introduced later to
 explain away a result. **The bar does not move and the count does not restart.**
@@ -716,9 +760,15 @@ explain away a result. **The bar does not move and the count does not restart.**
    and 25 of 27 land within ±0.4R of flat. There is **no consult at −0.5R, −0.7R or −0.9R that it
    held through**, so "it closes at about −0.3R" cannot be separated from "−0.3R is the worst it has
    ever been asked about." A distribution with no tail cannot yield a threshold.
-3. **ONE HELD BRANCH IS UNRESOLVED.** vpos 90's counterfactual never terminated — it is marked to
+3. ~~**ONE HELD BRANCH IS UNRESOLVED.** vpos 90's counterfactual never terminated — it is marked to
    market at 2026-08-01 12:25 (+0.291R for the advisor), not resolved by stop or trail. **One of the
-   four datapoints can still change sign.**
+   four datapoints can still change sign.**~~
+   ✅ **RETIRED 2026-08-03 — it terminated.** vpos 90's held branch hit its stop **63491.9 on the
+   5m bar of 2026-08-02 02:05 UTC** (O 62939.0 H **63500.0** L 62937.6 C 63365.9). Its +1R
+   breakeven arm at 61744.9 was never reached (window low 62245.0), so the stop stood untouched the
+   whole time and no trail could arm. Held net **−2.1541** vs the advisor's **−0.6099** →
+   **advisor +1.5442 (+0.769R)**, up from the +0.5837 mark. **All held branches are now terminated
+   and no datapoint can still change sign.** 828 real 5m BingX candles, 07-31 16:25 → 08-03 13:20.
 5. 🔴 **FROM `3316e8a` THE SAMPLE IS FILTERED — see §2.37a.** The loss-streak brake is live and
    blocks entries after three consecutive losses, so the remaining ~6 datapoints are drawn from a
    differently-selected population than the first four. Had it been live already it would have
@@ -1940,6 +1990,169 @@ The validation above is on `below_threshold` rows only, which is the one cohort 
 gated score. `risk_halt` row 20103 is **excluded from every gated-score figure**: its
 `macro_gate_penalty` is **NULL**, so its gate number is **not computable** — it is counted as having
 reached and passed the gate, and no score is asserted for it.
+
+### 2.39 ✅ FIXED (`ca90c2f`) — THE LEARNING LOOP GRADED **OPEN** POSITIONS. 47 of 65.
+
+`signal_weights.audit_pending` selected on **age alone** and never required the position to be
+closed; `_evaluate_trade_pnl` then invented an outcome **two different ways**:
+
+- `exchange.fetch_positions()` → the exchange's **UNREALIZED** pnl. Trade **20920** was stamped
+  **+0.5015 — a WIN — at 08:48:51 while its live short was open.** It closed at **−0.6410**.
+- no matching exchange position → `return 0.0, 'closed_unknown'`. **In PAPER mode there is never an
+  exchange position to find**, so this branch fired on **44 of the 65 engine-owned entries** and
+  graded every one **0.0**. **32 of those 44** had a realised outcome the store's own ±20/−15
+  thresholds call a win or a loss (19021: 0.0 vs **−143.67**; 10369: 0.0 vs **+370.45**).
+
+**Net: 47 of 65 (72%) graded mid-flight. The weight store learned from 18 trades — only those that
+closed inside the 2 h grace, a sample selected for FAST closers.**
+
+**The fix:** closure is `trades.pnl IS NOT NULL`, **in the WHERE clause**, plus a resolver that
+returns `None` so the caller skips. `_do_close` is the codebase's only `status='closed'` writer and
+writes `trades.pnl` in the same transaction for **both** modes — one predicate, no join, no mode
+branch. `AUDIT_MAX_AGE_HOURS` **24 → 96** because the window is entry-anchored and 24 h would have
+permanently discarded the **14 of 58 (24%)** positions held longer than a day (longest 74.33 h). **A
+position still open at 96 h is LEFT UNGRADED, PERMANENTLY** — never graded on a mark.
+
+🔴 **`audit_score` IS PERMANENT ONCE SET.** The queue predicate is `audit_score IS NULL`, so a row
+graded wrongly is **never re-picked**, even after its position closes and `pnl` appears. The fix
+prevents the next one; it repairs nothing.
+
+### 2.39a ✅ THE THREE WRONG GRADES — CORRECTED 2026-08-03 13:52 UTC
+
+Backup `trades.db.bak_gradefix_20260803` (SQLite `.backup()`, `integrity_check: ok`) taken first.
+One transaction, per-row assert `class(old) == class(new) == 'neutral'` **enforced, not assumed**
+(it aborts the whole transaction if a class ever changes, because that would mean a weight must
+move — a different operation). Rowcount asserted 1/1/1 per statement.
+
+| trade | vpos | was | now (realised) | Δ`total_pnl` | class |
+|---|---|---:|---:|---:|---|
+| 19589 | 86 | −1.2829 | **−2.541574** | −1.258674 | neutral → neutral |
+| 19713 | 87 | −0.3467 | **−0.819051** | −0.472351 | neutral → neutral |
+| 20920 | **91** | **+0.5015** | **−0.641000** | −1.142500 | neutral → neutral |
+
+Applied to `signal_weights.total_pnl` **and** `hyperwave_weights.total_pnl`. **`weight`, `wins`,
+`losses`, `evaluations` and `updated_at` untouched on both stores** — verified by full-table diff
+against the backup: exactly **3 trades rows, 3 combo rows, 3 subtype rows**, and `total_pnl` is the
+**only** field that differs on any of them. `updated_at` was deliberately left alone: it records
+when the evaluation happened, which is still true; bumping it would read as a new evaluation.
+
+### 2.39b 🔴 EVERY `learning_*` ATTRIBUTION WRITTEN BEFORE `ca90c2f` WAS PRODUCED AGAINST A MARK
+
+**Left in place and MARKED, deliberately — operator's decision, 2026-08-03.** Not cleared (that
+destroys the evidence the defect existed) and not re-run (a fresh LLM call produces a *different*
+verdict, not a *corrected* one).
+
+`_attempt_learning` receives `row_for_learning['pnl'] = outcome_pnl` — the same number the weights
+took — so **every attribution written before `ca90c2f` was reasoned against whatever
+`_evaluate_trade_pnl` invented**: an unrealized mark, or a fabricated `0.0`.
+
+**The demonstrable case, trade 20920** (`learning_at 2026-08-03 08:48:53`), verbatim:
+
+> *"Large ask wall (68.32 BTC at 62650.5) above entry created resistance, **enabling profitable short
+> exit as price rejected upward pressure**."*
+
+The position **had not exited**. It closed five hours later at **−0.6410**. This is not a wrong
+number — it is a wrong **story**, stored as text.
+
+**Cost is archival, not behavioural:** `learning_liquidity_factor`, `learning_aggression_factor`,
+`learning_influence`, `learning_confidence`, `learning_reason`, `learning_raw` are written only by
+`signal_weights._attempt_learning` and **read by nothing** — grep confirms no reader anywhere in the
+codebase. Nothing trades on them.
+
+**Treat every `learning_at < 2026-08-03 13:42` row as attributed to an unresolved outcome.** From
+`ca90c2f` forward the attribution sees a realised pnl.
+
+### 2.40 🔴🔴 THE COMBO-WEIGHT MECHANISM **CANNOT FUNCTION AT LIVE SIZE.** IT IS INERT, NOT MERELY BIASED.
+
+Measured 2026-08-03. **This is not a bias going forward — the table is frozen and every future live
+trade is a no-op on it.**
+
+**(a) The thresholds are absolute USDT and nothing scales them.** `WIN_THRESHOLD_USDT = 20.0` /
+`LOSS_THRESHOLD_USDT = −15.0`, declared twice (`signal_weights.py:42-43`, `engine_15m.py:56-57`) and
+compared raw: `if pnl >= WIN_THRESHOLD_USDT`. **No notional, margin, size, leverage or R term appears
+anywhere near either comparison.** Their own comment still describes the calibration they were
+written for: *"At $2000 margin × 5x = $10,000 notional, +$500 = +25% ROI on margin"*.
+
+**(b) Live-era grades that crossed either threshold: ZERO of 6.** What it would take:
+
+| vpos | 1R (USDT) | realised | R to reach **+20** | R to reach **−15** |
+|---|---:|---:|---:|---:|
+| 86 | 2.4866 | −2.5416 | **8.04R** | 6.03R |
+| 87 | 1.8628 | −0.8191 | **10.74R** | 8.05R |
+| 88 | 1.7918 | −0.5311 | **11.16R** | 8.37R |
+| 89 | 1.6610 | +2.3024 | **12.04R** | 9.03R |
+| 90 | 2.0091 | −0.6099 | **9.95R** | 7.47R |
+| 91 | 1.3234 | −0.6410 | **15.11R** | 11.33R |
+
+Mean **11.2R** to register a win, **8.4R** to register a loss.
+
+🔴 **The loss side is unreachable BY CONSTRUCTION, not merely unlikely** — the protective stop caps a
+live loss at ~1R. Largest live loss ever: **−2.5416**. Reaching −15 needs **6.0R at best**, i.e. the
+stop must **fail first**. Deepest adverse excursion ever observed live: **−0.920R**. So at live size
+the table can only ever move **up**, and in practice not at all.
+
+**The last grade capable of moving any weight was `audit_at 2026-07-20 02:24:17` — in the PAPER era,
+14 days ago and nine days before the live flip. Since the flip: 6 grades recorded, 0 threshold-crossing.**
+
+**(c) The size of the mismatch, expressed in R. RECORDED, NOT PROPOSED — no change is being made.**
+
+```
+PAPER 1R  mean 124.3608 USDT (n=24)   |   LIVE 1R  mean 1.8558 USDT (n=6)   |   ratio 67.0x
+   (notional ratio 10,000 / 146 = 68.5x — the 1R ratio tracks it)
+
+what +20 / -15 MEANT at paper size :  +0.1608 R  /  -0.1206 R
+the same meaning in LIVE dollars   :  +0.2985 USDT  /  -0.2238 USDT
+the constants actually in force    :  +20.0    /  -15.0
+                                      => 67x too high / 67x too deep
+```
+
+Sanity check that this is the right reading: at paper size **20 of 24 closes (83%) crossed a
+threshold** — the bar was ~0.16R, i.e. almost any real outcome cleared it. At live size **0 of 6**.
+
+**(d) YES — the frozen table is still SHOWN to the advisor, and that is a live influence channel.**
+`main.py:2001/3776` `weight_used = signal_weights.get_weight(combo)` → `consult_for_entry` →
+`claude_advisor.py:342` renders it verbatim into every entry prompt:
+
+```
+Combo weight: 0.90 (1.0 baseline; <1 = historical loser, >1 = winner)
+```
+
+**That is not hypothetical. Trade 19713 — a LIVE, real-money entry on 2026-07-30 — was shown
+`Combo weight: 0.90`, and that 0.90 came from a single PAPER evaluation of ≈−78.70 at 68× the
+notional.** 7 of 52 combos currently carry a weight ≠ 1.00; the newest of those judgements is from
+2026-07-20, the oldest from 2026-05-26.
+
+So: **the mechanism cannot update, but its output is still presented to the model as current fact,
+labelled "historical loser / winner".** The subtype store is *not* exposed this way — `claude_advisor`
+never imports `engine_15m` and `hw_weight` reaches only Telegram — so this channel is combo-weights
+only.
+
+**NOT FIXED, ONLY MEASURED.** Re-scaling the thresholds is a strategy change, and it interacts
+directly with §2.41. **Nothing here proposes adopting the R-equivalents above.**
+
+### 2.41 🔴 DEFERRED, EXPLICITLY NOT HOUSEKEEPING — THE 44-ROW RE-GRADE WOULD SET A **PERMANENT** WEIGHT
+
+Correcting the 44 paper rows that `_evaluate_trade_pnl` graded `0.0` (§2.39) would, replaying
+`record_outcome` in audit order over all 66 audited trades, move:
+
+```
+COMBO   weights : 29 of 53  (26 by +/-0.10, one 0.80 -> 0.60)
+SUBTYPE weights :  4 of 16
+     HW_SIGNAL_SHORT  0.85 -> 1.00      HW_SIGNAL_LONG  0.75 -> 0.85
+     HW_OB_SHORT      1.00 -> 0.90      REVERSAL_LONG   1.00 -> 0.95
+```
+
+**Both of the two most-used subtypes would stop being marked as losers.**
+
+🔴 **§2.40 makes this WEIGHTIER, not lighter, and that is the whole reason it is deferred.** If a
+weight can never move again at live size, then **whatever value this re-grade writes is the value
+that combo carries permanently** — and it is carried straight into the advisor's prompt on every
+future entry (§2.40d). It would not be a data repair that later evidence can correct; **it would be
+a final, unrevisable judgement, derived from a paper era at 68× the notional.**
+
+**Deferred by the operator, 2026-08-03. Not a cleanup. Requires an explicit decision that also
+answers §2.40 — because writing permanent weights while the update mechanism is inert is the
+decision, whichever way it goes.**
 
 ## 3. WATCH-LIST — CURRENT REALITY
 
