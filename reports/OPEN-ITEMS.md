@@ -51,7 +51,8 @@ understates realised live P&L by that amount. Any live-P&L total must add it bac
 
 The trail is deliberately still owned by the poller in live — see the ⚡ section below.
 
-_Last updated: **2026-08-03 14:15 UTC** — HEAD **`a85733f`**. §2.40e opened and CLOSED — the entry
+_Last updated: **2026-08-03 14:35 UTC** — HEAD **`34dbdbf`**. §2.42 opened and CLOSED — the book sources moved to OKX-4000 for storage, learning and the recheck; new columns `advisor_book_json`, `entry_okx_wall_baseline_mult`, `entry_book_src`, `recheck_events.book_src`, NULL on all legacy rows, not backfilled; both prompts byte-identical (md5), **window NOT reset**. Includes the non-advisor entry-path finding (0 of 65 positions; one entry ever, 2026-05-11, predating the engine; unreachable by today's alerts but legacy-not-dead). **§2.42a opened — the POST-WINDOW LIST as one coupled block: ①§1d fallback both halves · ②§3 entry-reference drift · ③§2.40/§2.41 thresholds+re-grade · ④retire `entry_wall_baseline_mult` WITH ①.**
+Earlier the same day: HEAD **`a85733f`**. §2.40e opened and CLOSED — the entry
 prompt's combo weight now carries its **provenance** (evaluation count · date of the most recent ·
 the POSITION SIZE they were taken at, as a ratio); the verdict wording *"<1 = historical loser"* is
 gone, **the number is kept**, and no minimum-n or staleness rule was invented. Freeze checked and
@@ -2227,6 +2228,58 @@ a final, unrevisable judgement, derived from a paper era at 68× the notional.**
 **Deferred by the operator, 2026-08-03. Not a cleanup. Requires an explicit decision that also
 answers §2.40 — because writing permanent weights while the update mechanism is inert is the
 decision, whichever way it goes.**
+
+### 2.42 ✅ BOOK SOURCES MOVED TO OKX-4000 (`34dbdbf`) — AND THE POST-WINDOW LIST, AS ONE BLOCK
+
+**Applied 2026-08-03 14:31 UTC, LIVE, flat.** `trades.advisor_book_json` holds the OKX-4000 dict the
+entry advisor was handed — **the same object, threaded down, never re-fetched**. The learning loop
+reads it. The recheck's baseline (`entry_okx_wall_baseline_mult`, a **NEW** column — repurposing
+`entry_wall_baseline_mult` would have been the `confluence_score` defect) and its refresh moved to
+OKX **together**, with **NO substitute venue** on failure and an explicit `book_unavailable` marker
+so a failed read is no longer indistinguishable from a pass. Wall-rule weight is 0, so **no verdict
+and no stop moved** — analytic hygiene, verified over 7 wall combinations all scoring −5.
+
+**Both prompts byte-identical (md5) before and after; the §2.4 window is NOT reset.** The structural
+reason: `entry_wall_baseline_mult` is **not** in the close prompt's read list, while
+`entry_sup_wall_mult` / `entry_ob_imbalance` **are** — and those are untouched.
+
+🔴 **FINDING, reported not changed — the non-advisor entry path.** `webhook()` delegates to
+`_handle_state_machine` (which consults the advisor) but also carries a legacy block reached by
+falling past **12 early returns**, where `_execute_entry` runs with **no advisor and no OKX book**.
+It keeps the confluence gate, the risk halt, the position cap and skip attribution; it loses the
+advisor. **Entries came through it: 0 of 65 positions** (all 65 are `ai_decision='execute'`; 59
+paper / 6 live). Across every executed row ever, **exactly one entry** — trade **181, 2026-05-11**,
+which **predates `virtual_positions`** (earliest position row 2026-05-17); the other 7 advisor-less
+rows are `15m_armed_exit` close legs. **Not reachable by anything TradingView sends today** — every
+observed `task` (`price_action` 1067, `confirmation` 107, `exit` 2, `trend_catch` 1, `signal` 1)
+routes to a handler that returns first — but it is **legacy, not dead**: an unrecognised `task` plus
+an `action` outside `ACTION_TO_SLOT` still lands there.
+
+### 2.42a 🔴 THE POST-WINDOW LIST — FOUR ITEMS, COUPLED. DO NOT TAKE THEM SINGLY.
+
+**① §1d — the exit advisor's OKX-down fallback. BOTH HALVES IN ONE COMMIT.** Repoint
+`entry_sup_wall_mult` / `entry_ob_imbalance` to OKX-4000 **AND** change the fallback to render **NO
+entry reference** when OKX is down rather than a BingX one. **Repointing alone pairs an OKX entry
+reference against a BingX "now"** — the exact cross-source comparison `625fedc` removed. The
+fallback fires on ~**5.1%** of AI-path consults. *Inside the close prompt.*
+
+**② §3 — the drifting "at entry" reference.** `main.py:2553-2573` takes the `orderbook_density` row
+nearest the fill (±10 min), so once a post-fill row exists it becomes nearer and the entry number
+changes **silently, once**. vpos 91: the −52.3 s row gave ×4.85 / 0.5517, the +8.7 s row ×4.08 /
+0.5584 — first consult `entry x4.8 → THINNED`, every later one `entry x4.1 → grew`, and that is the
+**denominator of the arrow**. **Fix: bound the search to rows at or BEFORE the fill** — stable and
+causally honest. *Inside the close prompt.*
+
+**③ §2.40 / §2.41 — the thresholds and the re-grade, one decision with two levers.** An inert
+mechanism makes a re-grade **permanent**; a live one makes it **revisable**.
+
+**④ RETIRE `entry_wall_baseline_mult` — WITH ①, not before.** After `34dbdbf` it is **written and
+read by nothing**. Its writer is kept only because ① still needs the BingX fetch alive for the
+frozen columns. **Once ① lands, that fetch's last consumer is gone and the column has no purpose** —
+drop the writer; keep the data, recorded as historical BingX depth-100.
+
+**Ordering constraint:** ④ cannot precede ①; ① cannot precede the window closing. ② shares ①'s gate
+but is otherwise independent. ③ is independent of both.
 
 ## 3. WATCH-LIST — CURRENT REALITY
 
