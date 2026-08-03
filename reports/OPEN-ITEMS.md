@@ -51,7 +51,8 @@ understates realised live P&L by that amount. Any live-P&L total must add it bac
 
 The trail is deliberately still owned by the poller in live — see the ⚡ section below.
 
-_Last updated: **2026-08-03 14:50 UTC** — HEAD **`489e0ac`**. §2.43 opened and CLOSED — the legacy fall-through now REFUSES to enter (alert + log + status stamp, no order); **the close half is untouched deliberately** (refusing a close could strand a position); proven **structurally** (`_execute_entry` has no call site left in `webhook()`), **not** behaviourally — a live probe was stopped earlier by the HTF cascade and state was not manipulated to force it. Prompts byte-identical, window untouched.
+_Last updated: **2026-08-03 16:10 UTC** — HEAD **`6d9281d`**. §2.44 opened and CLOSED — the "matrix TTL expired" label was rendered 77 times and was WRONG on 70 (91%, they were intra-conflict); now four strings for four states, the reason CAPTURED into `entry_tiers_json`, close prompt byte-identical, gate arithmetic untouched. Includes a correction to the 16:05 report (the 7 are genuine TTL expiries, so 70 wrong / 7 right — not 77 / 0). **§2.45 opened as a CLOSED QUESTION: THE LOSING ENTRIES ARE NOT IDENTIFIABLE IN ADVANCE ON THIS DATA — ten branches named and all negative; only live-era observations would change it, ~30 live entries ≈ three weeks.**
+Earlier the same day: HEAD **`489e0ac`**. §2.43 opened and CLOSED — the legacy fall-through now REFUSES to enter (alert + log + status stamp, no order); **the close half is untouched deliberately** (refusing a close could strand a position); proven **structurally** (`_execute_entry` has no call site left in `webhook()`), **not** behaviourally — a live probe was stopped earlier by the HTF cascade and state was not manipulated to force it. Prompts byte-identical, window untouched.
 Earlier the same day: HEAD **`34dbdbf`**. §2.42 opened and CLOSED — the book sources moved to OKX-4000 for storage, learning and the recheck; new columns `advisor_book_json`, `entry_okx_wall_baseline_mult`, `entry_book_src`, `recheck_events.book_src`, NULL on all legacy rows, not backfilled; both prompts byte-identical (md5), **window NOT reset**. Includes the non-advisor entry-path finding (0 of 65 positions; one entry ever, 2026-05-11, predating the engine; unreachable by today's alerts but legacy-not-dead). **§2.42a opened — the POST-WINDOW LIST as one coupled block: ①§1d fallback both halves · ②§3 entry-reference drift · ③§2.40/§2.41 thresholds+re-grade · ④retire `entry_wall_baseline_mult` WITH ①.**
 Earlier the same day: HEAD **`a85733f`**. §2.40e opened and CLOSED — the entry
 prompt's combo weight now carries its **provenance** (evaluation count · date of the most recent ·
@@ -2313,6 +2314,67 @@ substitute for the guard.
 
 The old branch body was **DELETED, not left unreachable under the return** — dead code still reading
 `entry[...]` would NameError the moment anyone removed the return (the 2026-07-29 class).
+
+### 2.44 ✅ THE "TTL EXPIRED" LABEL WAS WRONG 70 TIMES IN 77 — FIXED (`6d9281d`)
+
+`signal_tiers.build` set `counted_by_gate = (net_direction not in (None,'NEUTRAL'))`. A category nets
+NEUTRAL for **three structurally different reasons** — TTL expiry, **intra-conflict**, or no signal —
+and `render()` printed ONE sentence for all of them: *"NOT counted by the gate — matrix TTL expired"*.
+
+**Measured over the 87 stored `entry_tiers_json` records: rendered 77 times, WRONG on 70 (91%).**
+Those 70 were intra-conflict with the signal live and inside its TTL; **7 (9%) were genuine TTL
+expiry**.
+
+🔴 **vpos 91 is the case, and the mislabel PROPAGATED.** Its 15m tier was shown as **"25m ago"** and
+**"TTL expired"** in the same line under a **90-minute** MOMENTUM TTL — two facts that cannot both be
+true. The entry advisor cited it; so did the operator's question that led to the fix.
+
+**Fixed:** `build()` now captures the real reason into `not_counted` (+ `not_counted_detail` with the
+L/S split and signal count), **persisted to `entry_tiers_json`** so it cannot be re-derived wrongly
+later; `render()` looks it up and never re-derives. Four strings for four states; an unrecognised
+value degrades to *"the category nets NEUTRAL"* — vaguer than the truth, **never a false reason**.
+TTL minutes are read from `config.CATEGORY_TTL_MINUTES` so the printed number cannot drift.
+
+**FACTS, NOT JUDGEMENT** — same line as `f0a8d30`, `8b15ecc`, `a85733f`. **Freeze:** entry side;
+`entry_thesis_lines` (the only `signal_tiers` function the close prompt uses) has **0 references** to
+`counted_by_gate`/`not_counted`; entry-thesis block and full close prompt **byte-identical by md5**.
+**Gate arithmetic untouched** — `signal_matrix.py` not in the diff; `:322` still drops expired
+signals before scoring.
+
+⚠️ **CORRECTION TO THE 2026-08-03 16:05 REPORT, recorded not restated:** it said **0 of 77** were TTL
+expiry and 7 were "no signal". Splitting on the slot's `present` flag shows those 7 are **genuine TTL
+expiries** — the slot holds the signal, the matrix dropped it. **The honest split is 70 wrong / 7
+right.**
+
+### 2.45 🔴🔴 CLOSED QUESTION — **THE LOSING ENTRIES ARE NOT IDENTIFIABLE IN ADVANCE ON THIS DATA**
+
+**Ten measured attempts. All documented. All negative.** Recorded so no future session re-runs a dead
+branch.
+
+| # | branch | result | n |
+|---|---|---|---|
+| 1–4 | **four `market_regime` redefinitions** | all four still took the losing trade | — |
+| 5 | **ADX floor, 1st measurement** (2026-07-30) | sub-floor entries were the **BEST** cell (−0.02R vs −0.32R) | — |
+| 6 | **ADX floor, 2nd measurement** (2026-08-03) | holds: ADX1h <20 **not** worst (n=7, −0.112R); **20–25 best** (n=14, +0.167R); **ADX4h <20 is the best 4h cell** (n=11, +0.250R) | 39 |
+| 7 | **efficiency ratio at fixed 4h / 12h** | flat: +0.066 vs +0.010 (4h), −0.031 vs +0.102 (12h) | 39 |
+| 8 | **ATR(1h) vs its own 14-day median** | flat: +0.002 vs +0.072 | 39 |
+| 9 | **intra-conflict as a range proxy** | rejected 4 ways; **χ² ≤ 1.24** and the **sign REVERSES** between the 4h and 12h windows | 65 |
+| 10a | **1H tier age** | non-monotone: `<1h` +0.293 · `1–3h` −0.036 · `3–6h` +0.370 · `≥6h` −0.584 | 39 |
+| 10b | **5m tier age** | **zero variance** — it is the trigger, 0.00h on all 65 | 65 |
+| 10c | **15m tier age** | **not reconstructible before 2026-07-26**; 7 of 65 covered | 7 |
+| 10d | **ER over [signal fired → fill]** | **INVERTED**: predicted-worst cell is 2nd best (−0.028R); actual worst is "old **and** price moved cleanly" (−0.473R) | 27 |
+
+**The two flagged trades defeat all ten:** on age they sit at the **51st and 62nd percentile**; on
+ER-since-signal they land on **opposite sides of the median** (30th / 67th); and **vpos 86 carries one
+of the highest scores in the book (5.75) with ZERO intra-conflicts, three agreeing categories, at
+ADX(1h) 11.12** — it passes every filter ever considered and lost 1.02R.
+
+🔴 **WHAT WOULD CHANGE THIS — AND IT IS THE ONLY THING THAT WOULD: LIVE-ERA OBSERVATIONS.** The clean
+cohort is **39, of which 34 are paper**; the live era holds **5–6**. Every positive cell that
+motivates any rule rests on paper trades at **68× the notional**. At the measured rate of **1.5
+entries per active day**, **30 live entries is roughly three weeks.**
+
+**Until that sample exists, do not re-run these branches and do not fit a threshold to n=39.**
 
 ## 3. WATCH-LIST — CURRENT REALITY
 
