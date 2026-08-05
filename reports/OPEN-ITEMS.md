@@ -10,6 +10,49 @@
 (not copied forward): both `True`. HEAD **`44731be`** (`git rev-parse`). Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
+## 🔴 §0.0 — SILENCE IS NOT A FAULT: READ THIS BEFORE DIAGNOSING "THE ADVISOR STOPPED" (2026-08-05 21:50)
+
+**Written because five consecutive reports carried "no consultation since 16:40" as an open item, and
+a session with no memory would spend hours treating it as a break. It is not one.**
+
+**The bot can be fully alive and consult the entry advisor ZERO times for many hours.** Observed
+2026-08-05: last consultation of any kind **16:40:10 UTC**, then **0** across four deliberate
+restarts (19:08:39, 19:38:30, 20:31:57, 20:54:27) — over five hours.
+
+🔴 **THE INGESTION PATH WAS ALIVE THE WHOLE TIME.** Webhooks kept arriving and kept being written:
+`confirm_recorded` 20:45:05, `context_recorded` 20:20:04, `confirm_recorded` 20:15:06. Rows were
+appended to `trades` throughout, and `skip_drift_samples` kept sampling (702 rows in one ten-minute
+window).
+
+**WHAT DOES NOT HAPPEN IN THAT STATE:** a **5m trigger completing 3-way confluence**. That is the
+*only* event that consults the entry advisor. Everything else — 15m confirmations, 5m liquidity
+context, 1h trend sets — is recorded and does **not** call it.
+
+### HOW TO TELL THE TWO APART, IN ONE QUERY EACH
+
+| question | query | benign answer |
+|---|---|---|
+| is ingestion alive? | `SELECT MAX(timestamp), status FROM trades GROUP BY status ORDER BY 1 DESC LIMIT 5` | recent `confirm_recorded` / `context_recorded` rows |
+| are the observatories ticking? | `SELECT MAX(sampled_at) FROM skip_drift_samples` | current to the minute, or the next `due_at` is in the future |
+| has the advisor been asked? | `SELECT MAX(timestamp) FROM trades WHERE ai_user_prompt IS NOT NULL` | **may legitimately be hours old** |
+
+**If the first two are current and only the third is stale, nothing is broken — the advisor has not
+been asked.** Do not restart the service to "fix" it; four restarts on 2026-08-05 changed nothing and
+each one reset the clock on every pending live confirmation.
+
+⚠️ **CONSEQUENCE WORTH KNOWING:** any prompt change verified only "on live data through the real code
+path" stays **unconfirmed on a stored row** until confluence next fires. That is the honest status of
+the 18:55 wall-percentile change, the 19:38 prompt fixes and the 20:54 unrankable-book warning — all
+verified by execution, none yet seen in a stored prompt.
+
+⚠️ **AND THIS FILE IS STALE — the 30.07 fork is still open.** The header below still reads HEAD
+`44731be`; actual HEAD at this insertion is **`7a4169b`**, seven commits later
+(`b9081ad → 946fe74 → 1ec2477 → de1d0f2 → ece910d → 7472729 → 7a4169b`). The dated
+`*-open-items.md` snapshots remain the live truth for everything except this §0.0. **Trust the dated
+snapshots over this file's own header.**
+
+---
+
 🔴 **THE LIVE WINDOW IS NOT CONTINUOUS FROM 19:14 — do not state it as one line.** There was a
 27-minute revert to paper in between, and a session with no memory must not miss it:
 
