@@ -1,0 +1,150 @@
+--- main.py.bak_M6M7_partial_lossstreak_20260806	2026-08-06 13:19:35.530694783 +0000
++++ main.py	2026-08-06 13:35:16.531295266 +0000
+@@ -1572,20 +1572,55 @@
+         return False, f'position-cap check failed (fail-closed): {e}'
+ 
+     # Loss streak check
++    #
++    # 🔴 M7 2026-08-06 — READ THE BOOK YOU PROTECT. This is the daily-loss brake's
++    # unfixed twin: that brake was moved onto `virtual_positions` filtered by
++    # COALESCE(is_paper,1)=? on 2026-08-05, and the loss-streak gate beside it was
++    # left reading `trades` with NO paper/live filter at all.
++    #
++    # WHY THAT IS THE WHOLE DEFECT: at the flip this gate would halt LIVE trading on
++    # a streak made entirely of PAPER losses. Measured at the time of this change it
++    # read 2 of 3 negative — ONE more paper loss from a 4-hour halt on real money
++    # that had not yet placed a single trade. After the fix, live mode reads the LIVE
++    # book, which has zero closed rows, so `len(rows) >= LOSS_STREAK_THRESHOLD` is
++    # false and the gate cannot halt the first live trade on paper history.
++    #
++    # 🔶 AND BE ACCURATE ABOUT WHAT IT IS NOT. The audit also said one armed exit is
++    # stored TWICE in `trades` and could count as two consecutive losses. MEASURED:
++    # it cannot. Both rows exist (21 entry + 21 close for 21 positions), but every
++    # entry row carries pnl NULL — 0 of 21 have a pnl — so `pnl IS NOT NULL` already
++    # excludes them, and the close rows are exactly 1:1 with closed positions. Over
++    # 30 days both books yield an IDENTICAL streak history. The double-count is real
++    # in the table and unreachable by this query.
++    #   That said, `trades` is still the wrong book, and not only for the filter:
++    #   its labels have already diverged from the engine's (row 15004 is
++    #   'sl_triggered_short' in `trades` and close_reason='trail' in
++    #   virtual_positions), and the exclusion that saves the query today is an
++    #   accident of how entry rows happen to be written, not a declared invariant.
++    #   Depending on it is depending on something nobody promised.
++    #
++    # ORDER BY closed_at, NOT id: vpos ids are assigned when a position OPENS, so a
++    # position opened earlier but closed later would order wrong by id. The streak is
++    # about the order things CLOSED in.
++    _streak_book = 1 if OBSERVATION_MODE else 0
+     try:
+         with sqlite3.connect(DB_PATH) as conn:
+             rows = conn.execute(
+-                "SELECT pnl FROM trades WHERE status='executed' AND pnl IS NOT NULL "
+-                "ORDER BY id DESC LIMIT ?",
+-                (LOSS_STREAK_THRESHOLD,),
++                "SELECT net_pnl FROM virtual_positions "
++                "WHERE status='closed' AND net_pnl IS NOT NULL "
++                "  AND COALESCE(is_paper, 1) = ? "
++                "ORDER BY closed_at DESC LIMIT ?",
++                (_streak_book, LOSS_STREAK_THRESHOLD),
+             ).fetchall()
+         streak = sum(1 for r in rows if (r[0] or 0) < 0)
+         if streak >= LOSS_STREAK_THRESHOLD and len(rows) >= LOSS_STREAK_THRESHOLD:
+             last_loss_ts = None
+             with sqlite3.connect(DB_PATH) as conn:
+                 ts_row = conn.execute(
+-                    "SELECT timestamp FROM trades WHERE status='executed' AND pnl < 0 "
+-                    "ORDER BY id DESC LIMIT 1"
++                    "SELECT closed_at FROM virtual_positions "
++                    "WHERE status='closed' AND net_pnl < 0 "
++                    "  AND COALESCE(is_paper, 1) = ? "
++                    "ORDER BY closed_at DESC LIMIT 1", (_streak_book,)
+                 ).fetchone()
+             if ts_row:
+                 try:
+@@ -2631,6 +2666,9 @@
+                     'positionIdx': 1 if position_side == 'LONG' else 2,
+                     'clientOrderId': k}),
+         label='create_market_order.partial', idem_key=_idem)
++    # `float(x or 0) or None` is KEPT DELIBERATELY (M6c): a genuine ZERO fill becomes
++    # None, i.e. "nothing was reduced", which is exactly right. It is not the same
++    # thing as an unreadable fill, and the two must not collapse into one value.
+     filled = float((order or {}).get('filled') or 0) or None
+     if filled is None and (order or {}).get('id'):
+         try:
+@@ -2639,9 +2677,73 @@
+                 label='fetch_order.partial')
+             filled = float(o.get('filled') or 0) or None
+         except Exception as e:
+-            print(f"{LOG_PREFIX}[PARTIAL-LIVE] fill read FAILED ({e}) — falling back to "
+-                  f"requested {want}; accounting may differ from reality", flush=True)
+-            filled = want
++            # 🔴 M6 2026-08-06 — THE PARTIAL USED TO GUESS WHERE THE ENTRY REFUSES TO.
++            # This line was `filled = want` — the REQUESTED size. That is Titan's F3
++            # arriving through the back door, in the one bot that fixed F3 before
++            # Titan found it: the book is written down by what was ASKED, and
++            # `_apply_partial_at_arm` then derives `rem`, the fee split (`qty/size`)
++            # and every downstream R from a number the venue never confirmed.
++            # `_read_entry_fill` refuses to guess a size; so does this now.
++            #
++            # BUT REFUSING IS NOT ENOUGH ON ITS OWN, and this is the M1 lesson
++            # applied to the mirror case: THE REDUCE ORDER HAS ALREADY BEEN SENT.
++            # The venue size has changed and the book has not, so simply giving up
++            # leaves them disagreeing. Before alerting, ask a DIFFERENT and more
++            # authoritative question: how big is the position NOW? `held` was read
++            # before the order, so (held - contracts_now) is the amount that really
++            # left — MEASURED at the venue, not guessed from intent. It is a
++            # different endpoint from the one that just failed, so a fetch_order
++            # outage does not take it with it.
++            print(f"{LOG_PREFIX}[PARTIAL-LIVE] fill read FAILED ({e}) — NOT guessing; "
++                  f"re-deriving from the position size instead", flush=True)
++            try:
++                _st2, _pos2 = _fetch_position_state(symbol, position_side)
++                if _st2 is POS_FLAT:
++                    # The whole position is gone: the reduce closed it outright
++                    # (or a stop fired in the same instant). Everything held left.
++                    filled = float(held) or None
++                    print(f"{LOG_PREFIX}[PARTIAL-LIVE] position now FLAT — the full "
++                          f"{held} was reduced", flush=True)
++                elif _st2 is POS_OPEN:
++                    _now_held = float(_pos2.get('contracts') or 0)
++                    _delta = held - _now_held
++                    # A negative or absurd delta means the position GREW or the read
++                    # is inconsistent — that is not a fill, it is a contradiction,
++                    # and it must not be booked as one.
++                    filled = _delta if _delta > 1e-9 else None
++                    print(f"{LOG_PREFIX}[PARTIAL-LIVE] derived from position size: "
++                          f"{held} → {_now_held} = {filled} reduced", flush=True)
++                else:
++                    filled = None      # POS_UNKNOWN — the read failed too
++            except Exception as e2:
++                print(f"{LOG_PREFIX}[PARTIAL-LIVE] position re-read ALSO failed ({e2})",
++                      flush=True)
++                filled = None
++            if filled is None:
++                # 🔴 END STATE, NAMED: the reduce was SENT and we cannot substantiate
++                # ANY size. The book is left UNCHANGED — deliberately, because a
++                # wrong number here corrupts net_pnl, the fee split and every R that
++                # follows, while an unchanged book is merely STALE and is corrected
++                # the moment a read succeeds. The position REMAINS MANAGED: its
++                # virtual_positions row is untouched and still open, the engine keeps
++                # polling it, its stop is still on the venue and the trail stays
++                # armed. Nothing is naked. What is wrong is the SIZE, and the eventual
++                # close is safe anyway — _execute_close_position sizes from
++                # `pos['contracts']`, the VENUE's number, never from the book.
++                _record_naked_position(
++                    symbol, position_side, stage='partial_fill_unreadable',
++                    detail=f'requested={want} held_before={held} — reduce SENT, size '
++                           f'NOT substantiated; book left unchanged')
++                send_tg(f"⚠️ <b>Partial fill UNREADABLE</b> ({symbol} {position_side})\n"
++                        f"A reduce-only order for <b>{want}</b> was SENT, but neither "
++                        f"the order nor the position size could be read back.\n"
++                        f"<b>The book was NOT written down from a guess</b> — it still "
++                        f"shows the full size, so it may now OVERSTATE the position.\n"
++                        f"✅ The position stays managed and protected: its stop is on "
++                        f"the exchange and the close sizes from the venue, not the book.\n"
++                        f"<b>Do:</b> compare the {position_side} size on Bybit against "
++                        f"the bot's card; the P&L on this position will be overstated "
++                        f"by the partial until it is reconciled by hand.")
+     if filled and abs(filled - want) > 1e-9:
+         print(f"{LOG_PREFIX}[PARTIAL-LIVE] PARTIAL FILL: requested {want}, filled "
+               f"{filled} — accounting follows the FILLED size", flush=True)
