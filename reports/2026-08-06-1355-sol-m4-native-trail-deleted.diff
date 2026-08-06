@@ -1,0 +1,151 @@
+--- main.py.bak_M4_native_trail_deleted_20260806	2026-08-06 13:35:16.531295266 +0000
++++ main.py	2026-08-06 13:51:21.555155104 +0000
+@@ -1839,28 +1839,53 @@
+     return None
+ 
+ 
+-def _place_trail_with_retry(symbol, market_id, pos_idx, trail_cb, active_price,
+-                             max_attempts=3):
+-    """Set trailing stop via position/trading-stop API with retry. Returns True on success."""
+-    for attempt in range(1, max_attempts + 1):
+-        try:
+-            ts_resp = tor_retry.with_socks_retry(exchange, lambda ex: ex.private_post_v5_position_trading_stop({
+-                'category':     'linear',
+-                'symbol':       market_id,
+-                'positionIdx':  str(pos_idx),
+-                'trailingStop': str(trail_cb),
+-                'activePrice':  str(active_price),
+-            }), label='trail.set')
+-            ok = ts_resp.get('retCode') in ('0', 0)
+-            if ok:
+-                return True
+-            print(f"{LOG_PREFIX}[TRAIL] attempt {attempt}/{max_attempts} API error: {ts_resp}",
+-                  flush=True)
+-        except Exception as e:
+-            print(f"{LOG_PREFIX}[TRAIL] attempt {attempt}/{max_attempts} failed: {e}", flush=True)
+-        if attempt < max_attempts:
+-            time.sleep(0.5 * (2 ** (attempt - 1)))
+-    return False
++# ── 🔴 M4 2026-08-06 — `_place_trail_with_retry` IS DELETED. DO NOT RE-ADD IT. ──
++#
++# It set Bybit's NATIVE trailing stop (`trailingStop` = 2.5×ATR, `activePrice` = +1R)
++# on every live entry, and it was THE SECOND POSITION MANAGER.
++#
++# THE FUNCTION IS REMOVED RATHER THAN LEFT UNCALLED, DELIBERATELY. An uncalled
++# function that reads as armed is the exact defect class this whole audit exists to
++# close: three mechanisms with zero runs were found on Titan on 2026-08-05 for the
++# same reason. A reader finding `_place_trail_with_retry` in this file would
++# reasonably conclude SOL arms a venue trail. It does not. So there is nothing left
++# to read but this note.
++#
++# WHY IT WENT — three arguments, and the first is specific to SOL:
++#  1. 🔴 IT IS THE ONLY EXIT MECHANISM PAPER HAS NEVER RUN. The single call site sat
++#     below `if OBSERVATION_MODE: return …`, so in 21 closed positions it never once
++#     executed. SOL is in paper FOR the paper-versus-live comparison; keeping a
++#     live-only exit mechanism would mean the live book's exits came from machinery
++#     the paper book has never exercised — the comparison would measure the wrong
++#     thing from trade one.
++#  2. THE ARCHITECTURE ALREADY RULED ON THIS. `start_monitor` was retired on
++#     2026-08-01: "two managers on one position disagree about breakeven state and
++#     either can close it." The native trail IS the surviving second manager; that
++#     retirement simply did not look across the wire.
++#  3. THEY WERE NEVER TWO POLICIES. Same distance (TRAIL_MULT_ATR×ATR = 2.5×ATR),
++#     same arming price (activation_distance = SL_BUFFER_ATR×ATR = +1R). One was
++#     redundant by construction, and the redundant one SHADOWED the other's adaptive
++#     logic — the venue tracks a continuous tick high-water mark, the engine samples
++#     every 10s, so the venue would fire first and the engine's fresh-ATR trail_pct
++#     recompute at +1R would never have been observed to act.
++#
++# 🔴 THE COST, RECORDED SO IT IS NOT REDISCOVERED AS A SURPRISE: open profit ABOVE
++# BREAKEVEN is no longer ratcheted if the process dies. The position is NOT
++# unprotected — the venue holds the position-level stop, which the engine pushes to
++# breakeven at +1R — but gains above breakeven are defended only by a RUNNING
++# PROCESS. Worst case, named: a runner at +4R gives back to breakeven. That is a
++# loss of UNREALISED GAIN, not of capital, and it is the price of this decision.
++#
++# 🔶 THE FOLLOW-UP, RECORDED AS NOT DONE: have the engine PUSH its trail level to the
++# venue stop as it ratchets, through `_move_stop_to`, which it already owns (today
++# `_process_position` section 4 only tests trail_hit and CLOSES — it never moves the
++# stop). That would make the trail adaptive AND venue-backed, so process death would
++# cost only FUTURE ratcheting, never locked gains.
++#   WHY NOT NOW: every ratchet step becomes a Tor round-trip on a link that produced
++#   285 SOCKS retries and 26 CloudFront 403s in two days, so it needs a rate limit or
++#   a materiality threshold before it is safe — that is design work. Shipping it in
++#   the same change as this deletion would put TWO behaviour changes into the exit
++#   path immediately before a flip, and neither could then be attributed.
+ 
+ 
+ def _resolve_fee(order_fee, *, price, amount, label):
+@@ -2249,7 +2274,9 @@
+         round_price=lambda p: float(exchange.price_to_precision(symbol, p)),
+     )
+     close_side = 'sell' if position_side == 'LONG' else 'buy'
+-    sl_id = tp_id = None
++    # M4: `tp_id` is no longer seeded here — it is assigned once, after
++    # book_live_position, from the engine row that owns the trail.
++    sl_id = None
+     # _place_sl_with_retry retries 3× with backoff (0.5s/1.0s), which also covers
+     # the brief window in which a just-filled market order has not yet registered
+     # as a position the trading-stop endpoint will accept.
+@@ -2385,7 +2412,8 @@
+     raw_active = (fill_price + _act_dist if position_side == 'LONG'
+                   else fill_price - _act_dist)
+     active_price = float(exchange.price_to_precision(symbol, raw_active))
+-    market_id    = exchange.market(symbol)['id']          # 'SOLUSDT' — required by trading-stop API
++    # `market_id` was computed here for the native trailing-stop call ONLY. That call
++    # is gone (M4), so the local is gone with it rather than left dangling.
+ 
+     # 🔴 M1 — THE STOP-PLACEMENT BLOCK THAT STOOD HERE HAS MOVED UP, above the fill
+     # read. `close_side`, `sl_id`/`tp_id` and the fail-safe now live there; this is
+@@ -2394,23 +2422,12 @@
+     # 'observed_skipped') is replaced by _sl_failsafe, which alerts and raises with
+     # a status of its own — see M2.
+ 
+-    # Trailing stop via position/trading-stop (retry 3×).
+-    tp_id = _place_trail_with_retry(symbol, market_id, pos_idx, trail_cb, active_price)
+-    if not tp_id:
+-        # PHASE 3 (3): the return was assigned and NEVER inspected, so a position could
+-        # run with NO trailing stop while the DB still showed a trail_pct.
+-        # DELIBERATELY NOT an emergency close: the STOP is the protection, the trail is
+-        # the improvement. Closing a correctly-stopped position because an improvement
+-        # failed is the wrong trade.
+-        print(f"{LOG_PREFIX}[TRAIL] NOT SET after 3 attempts — position runs on the "
+-              f"stop alone", flush=True)
+-        send_tg(f"⚠️ <b>Trailing stop NOT set</b> {symbol} {position_side}\n"
+-                f"The position IS protected — its stop-loss is on the exchange at "
+-                f"{sl_price}. What is missing is the trail, so profit will not be "
+-                f"ratcheted automatically.\n"
+-                f"<b>You can:</b> set a trailing stop manually on Bybit, or leave it — "
+-                f"the position exits on its stop, the breakeven move, or an exit "
+-                f"signal. <b>No action is required for safety.</b>")
++    # 🔴 M4 — NO TRAILING-STOP CALL IS MADE HERE ANY MORE. The native trail and the
++    # whole `if not tp_id:` failure branch went with it: there is no venue trail left
++    # to fail, so an alert saying "trailing stop NOT set" would now be describing a
++    # mechanism that no longer exists. THE TRAIL IS THE ENGINE'S, IN BOTH MODES.
++    # `trail_cb` still feeds `trail_pct` above — that is the number the engine trails
++    # on and the number the card and the DB show, and it is unchanged.
+ 
+     # ── 2026-08-05 (P1) — BOOK THE LIVE POSITION ────────────────────────────
+     # Until today this return went straight to the caller, which stamped the
+@@ -2435,6 +2452,21 @@
+         entry_fee=fee_cost, trades_row_id=row_id, send_tg=send_tg,
+     )
+ 
++    # 🔴 M4 — WHAT `tp_id` MEANS NOW, AND WHY IT IS NOT SIMPLY DROPPED.
++    # It used to hold the result of the native trailing-stop call, and the caller
++    # renders it as the card's `🎯 TRAIL ✓/✗` tag. Leaving it None would print ✗ on
++    # every live entry while paper printed ✓ (virtual_trader returns
++    # 'VIRT-TRAIL-{vpos_id}') — a NEW paper-versus-live divergence in the operator's
++    # card, introduced by a change whose whole purpose was to remove one.
++    #
++    # So the field keeps its shape and its meaning is made TRUE: the trail is now the
++    # engine's in both modes, and the engine can only trail a position it has a ROW
++    # for. `_vpos_id` is None exactly when book_live_position failed — in which case
++    # there genuinely is no trail, and ✗ is the honest tag. The card's tag therefore
++    # stops reporting "a venue call succeeded" and starts reporting something that
++    # actually matters: IS THE ENGINE MANAGING THIS POSITION'S TRAIL?
++    tp_id = f'ENGINE-TRAIL-{_vpos_id}' if _vpos_id else None
++
+     return {
+         'order':        order,
+         'fill_price':   fill_price,
