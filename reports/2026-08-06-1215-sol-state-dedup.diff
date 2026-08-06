@@ -1,0 +1,129 @@
+--- /mnt/volume_nyc1_1780480650620/mercury-sol/claude_advisor.py	2026-08-04 23:21:24.778859362 +0000
++++ claude_advisor.PROPOSED.py	2026-08-06 11:56:21.431871098 +0000
+@@ -22,6 +22,8 @@
+ """
+ import json
+ import re
++import threading
++import time
+ from datetime import datetime, timezone   # 2026-08-01: 15m tier age in the entry prompt
+ 
+ import anthropic
+@@ -84,6 +86,40 @@
+         _client = anthropic.Anthropic(max_retries=0)
+     return _client
+ 
++# ── 2026-08-06 — ONE MARKET STATE, ONE CONSULTATION ──────────────────────────
++# TradingView fires several DISTINCT 5m alerts on one bar close (Bullish OB
++# Created, Bullish I-CHOCH+, Within Bullish OB …). Each is its own webhook, its
++# own trades row and its own combo_key — correctly so. But each also fired its
++# own model call against a 1H tier, a 15m tier, a regime and a book that are the
++# SAME. Measured over the full book (3,336 consultations, 59 days): 1.25 calls
++# per market state, 20.2% of all calls redundant, worst case 5 calls for one
++# state. Inside a multi-call state the verdict was identical 99.2% of the time,
++# the nearest opposing wall's PRICE never moved (0 of 353), and 100% of the
++# redundant calls landed within 60 SECONDS of the first.
++#
++# So the verdict is cached on the STATE, not the row, for 60s. The 5m trigger's
++# identity is deliberately NOT in the key — it is the only thing that differs,
++# and caching on it would cache nothing. It IS preserved everywhere it is
++# load-bearing: the caller still inserts its own trades row, builds its own
++# combo_key (1H|15M|5M — the weight-lookup and optimizer cohort key) and writes
++# its own skip_attribution row. Only the MODEL CALL is skipped.
++#
++# The nearest opposing wall PRICE is in the key so a genuine book shift busts the
++# cache; its MULTIPLE is not, because that wobbles in the first decimal between
++# two reads of the same wall (16.4% of states) and is not a state change.
++#
++# 🔴 'unavailable' is NEVER cached — an API failure must not be pinned for 60s.
++_STATE_VERDICT_TTL_S  = 60.0
++_state_verdict_cache  = {}            # key -> (monotonic_at, result_dict, provenance)
++_state_verdict_lock   = threading.Lock()
++
++
++def state_verdict_cache_clear():
++    """Test/ops hook — the cache is process-local and dies with the worker."""
++    with _state_verdict_lock:
++        _state_verdict_cache.clear()
++
++
+ _ENTRY_SYSTEM = (
+     "You are an automated trading decision module for a SOL/USDT perpetual "
+     "swing bot. You receive multi-timeframe LuxAlgo signal context (1H trend, "
+@@ -587,6 +623,56 @@
+         "Decide whether the bot should execute this entry now."
+     )
+ 
++    # ── ONE MARKET STATE, ONE CONSULTATION (2026-08-06) ─────────────────────
++    # The key is built from the tier SLOT TIMESTAMPS, not the rendered ages, so a
++    # tier that is REFRESHED inside the 60s window starts a new state and is
++    # asked again. Everything the verdict is allowed to depend on is either in
++    # the key or bounded by the TTL.
++    def _slot_identity(_slot):
++        return (_slot.get('signal_name'), _slot.get('direction'), _slot.get('timestamp'))
++
++    _dir_key = (direction or '').upper()
++    _near_opposing = None
++    try:
++        _side_walls = (pre_trade_walls or {}).get(
++            'walls_ask' if _dir_key == 'LONG' else 'walls_bid') or []
++        if isinstance(_mid, (int, float)):
++            _cands = [w for w in _side_walls
++                      if isinstance(w.get('price'), (int, float))
++                      and (w['price'] > _mid if _dir_key == 'LONG' else w['price'] < _mid)]
++            if _cands:
++                _near_opposing = min(_cands, key=lambda w: abs(w['price'] - _mid))['price']
++    except Exception as _e:   # a malformed book must never break the entry path
++        print(f"[MERCURY-SOL][STATE-CACHE] wall read failed (non-fatal, key degrades "
++              f"to tiers only): {type(_e).__name__}: {_e}", flush=True)
++
++    _state_key = (symbol, _dir_key, _slot_identity(_h1), _slot_identity(_m15),
++                  _near_opposing)
++    _now_mono = time.monotonic()
++    with _state_verdict_lock:
++        for _stale_k in [k for k, (t, _r, _p) in _state_verdict_cache.items()
++                         if _now_mono - t > _STATE_VERDICT_TTL_S]:
++            del _state_verdict_cache[_stale_k]
++        _hit = _state_verdict_cache.get(_state_key)
++
++    if _hit is not None:
++        _hit_at, _hit_result, _hit_prov = _hit
++        result = dict(_hit_result)
++        # 🔴 PROVENANCE: `user_prompt` keeps naming the prompt that ACTUALLY
++        # produced this verdict — the same rule the 2026-08-01 system-prompt fix
++        # established. THIS row's rendering is carried separately so nothing is
++        # lost and nothing lies about what the model was shown.
++        result['verdict_reused']        = True
++        result['verdict_reused_age_s']  = round(_now_mono - _hit_at, 3)
++        result['verdict_reused_from']   = _hit_prov
++        result['rendered_user_prompt']  = user
++        print(f"[MERCURY-SOL][STATE-CACHE] HIT — reusing the verdict for this market "
++              f"state, no model call. {_dir_key} decide={result.get('decide')!r} "
++              f"age={result['verdict_reused_age_s']}s "
++              f"this_5m={(_m5.get('signal_name') or 'n/a')!r} "
++              f"decided_on_5m={_hit_prov.get('trigger_5m')!r}", flush=True)
++        return result
++
+     result = _call(_ENTRY_SYSTEM, user)
+     decide = (result.get('decide') or '').lower().strip()
+     if decide not in ('execute', 'skip', 'unavailable'):
+@@ -778,6 +864,19 @@
+     result['system_prompt'] = _verdict_system
+     result['user_prompt'] = user
+     result['model'] = MODEL
++
++    # Store AFTER the stamps, so a reused copy carries the system prompt that
++    # actually produced it — including an aligned-V2 flip, which replaces both the
++    # verdict and `_verdict_system` above. The relaxation is part of the verdict,
++    # so a cache hit correctly does not re-fire it either: at 7.8 extra calls/day
++    # for 3 verified flips, re-asking it per 5m trigger is the same waste twice.
++    # Only a real verdict is cached; the 'unavailable' sentinel is never pinned.
++    if (result.get('decide') or '') in ('execute', 'skip'):
++        with _state_verdict_lock:
++            _state_verdict_cache[_state_key] = (
++                time.monotonic(), dict(result),
++                {'trigger_5m': _m5.get('signal_name'),
++                 'at': datetime.now(timezone.utc).isoformat()})
+     return result
+ 
+ 
