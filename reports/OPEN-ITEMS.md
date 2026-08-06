@@ -10,10 +10,17 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `22a085e`, re-verified by `git rev-parse` at 2026-08-05 22:50 UTC** — and every value in
+🔴 **HEAD `38cd64c`, re-verified by `git rev-parse` at 2026-08-06 00:12 UTC** — and every value in
 this header and in the current-state table below was re-read by **importing `config` at runtime in the
 same pass**, not copied forward. The previous header read `44731be`, which was **12 commits stale**
 because body edits never refreshed it; see the correction in §0.0 and the guard in §2.58.
+
+**Since `22a085e`:** `acf579e` carries the four money-path fixes F1/F3/F4/F7 from the 23:20
+order-adapter audit (its message is the midnight cron's generic backup text — it fired while the
+working tree held the edits); `38cd64c` is the description `acf579e` should have carried. **No gate,
+geometry value, score bar, prompt or schema moved** — an AST per-function diff shows 7 functions
+changed and 4 added, all in `main.py` / `order_adapter.py` / `virtual_trader.py`. Report:
+`reports/2026-08-06-0010-titan-four-money-path-defects-fixed-read-failure-partial-size-zero-fill-close-ordering.md`.
 
 ## 🔴 §0.0 — SILENCE IS NOT A FAULT: READ THIS BEFORE DIAGNOSING "THE ADVISOR STOPPED" (2026-08-05 21:50)
 
