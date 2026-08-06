@@ -10,10 +10,58 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `7c2feac`, re-verified by `git rev-parse` at 2026-08-06 00:32 UTC** — and every value in
+🔴 **HEAD `999572a`, re-verified by `git rev-parse` at 2026-08-06 01:15 UTC** — and every value in
 this header and in the current-state table below was re-read by **importing `config` at runtime in the
 same pass**, not copied forward. The previous header read `44731be`, which was **12 commits stale**
 because body edits never refreshed it; see the correction in §0.0 and the guard in §2.58.
+
+## 🔴 §0.1 — G1 IS **BLOCKED ON THE OPTIMIZER AUDIT**. DO NOT QUOTE "0.75R TRAIL" UNTIL IT IS ANSWERED (2026-08-06 01:15)
+
+**The engine does not give back 0.75R, and it never did give back exactly the nominal number.**
+`trail_pct` is computed as a fraction **of the ENTRY price**
+(`_trail_pct_for`: `TRAIL_MULT_ATR × atr / initial_fill_price × 100`) and then applied **to the
+WATER MARK** (`trigger = water_mark × (1 ∓ trail_pct/100)`). Those are different bases, so the
+giveback drifts with MFE — and **in opposite directions on the two sides**, because a LONG's water
+mark rises above entry while a SHORT's falls below it.
+
+**MEASURED on the 14 positions that actually closed on the trail**, mechanism isolated from
+gap/slippage (`mechanism giveback = water_mark × trail_pct`):
+
+| side | n | mechanism giveback | nominal (`pct × entry`) | skew |
+|---|---|---|---|---|
+| **LONG** | 3 | **1.0160R** | 0.9997R | **+0.0163R (+1.63%)** |
+| **SHORT** | 11 | **0.9591R** | 1.0000R | **−0.0409R (−4.09%)** |
+
+Modelled forward at the new geometry on live values: **MFE 1.0R → 0.7560R · 2.0R → 0.7625R ·
+3.0R → 0.7690R.** The documented 0.7500R is exact only when `water_mark == entry`, which never
+happens because **the trail arms at +1R**.
+
+🔴 **THE QUESTION THAT DECIDES WHETHER THIS IS A BUG OR A CALIBRATION ERROR — and it is the FIRST
+thing the optimizer audit must answer:**
+
+> **Did the 2026-08-04 grid compute giveback as `pct × entry` or as `pct × water_mark`?**
+
+- If the grid used **`pct × water_mark`**, it measured the real mechanism and **1.6875 is calibrated
+  against a quantity the engine actually produces** — G1 then reduces to a documentation defect (the
+  label "0.75R" is wrong; the choice is sound).
+- If the grid used **`pct × entry`**, then **1.6875 was chosen against a number the engine does not
+  produce**, and the whole R-axis of §2.53's re-run is offset — by a side-dependent amount that runs
+  in the SAME direction as the LONG-vs-SHORT gap the partial exists to fix.
+
+**Until that is answered, do not treat "trail = 0.75R" as a fact anywhere**, and do not re-tune
+`TRAIL_MULT_ATR` on the strength of it. **0 positions have closed on the new geometry**, so nothing
+has yet contradicted the label out loud. Full measurement:
+`reports/2026-08-06-0050-titan-geometry-arithmetic-audited-1R-the-stop-the-trail-and-the-partial.md`.
+
+---
+
+**Since `7c2feac`:** `999572a` closes **G3** (the boot re-attach read a hardcoded `'5m'` on a 1h
+geometry — a stop at **0.191×** the intended distance on a live naked position; it now reads
+`SL_ATR_TF`/`TRAIL_ATR_TF` from config and attaches **nothing** if the ATR fetch fails) and **G2**
+(the LONG partial's banked PnL never reached `report`, so the row said +1.0386R while Telegram, the
+batch block and the observatory said +0.6736R — the correction now happens inside
+`close_report.build_close_report`, and **no historical row is rewritten**). Report:
+`reports/2026-08-06-0115-titan-g2-g3-fixed-one-close-number-and-a-stop-on-the-right-timeframe.md`.
 
 **Since `38cd64c`:** `7c2feac` closes **F2** (deterministic `clientOrderID` **plus** a pre-retry
 exchange check that adopts an existing stop — see the boxed correction in §1a) and **F9c** (the
