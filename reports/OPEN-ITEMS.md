@@ -10,12 +10,12 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `999572a`, re-verified by `git rev-parse` at 2026-08-06 01:15 UTC** — and every value in
+🔴 **HEAD `897850b`, re-verified by `git rev-parse` at 2026-08-06 01:58 UTC** — and every value in
 this header and in the current-state table below was re-read by **importing `config` at runtime in the
 same pass**, not copied forward. The previous header read `44731be`, which was **12 commits stale**
 because body edits never refreshed it; see the correction in §0.0 and the guard in §2.58.
 
-## 🔴 §0.1 — G1 IS **BLOCKED ON THE OPTIMIZER AUDIT**. DO NOT QUOTE "0.75R TRAIL" UNTIL IT IS ANSWERED (2026-08-06 01:15)
+## ✅ §0.1 — G1: THE TRAIL'S "0.75R" IS A **LABEL DEFECT ONLY**. THE CALIBRATION STANDS (answered 2026-08-06 01:40)
 
 **The engine does not give back 0.75R, and it never did give back exactly the nominal number.**
 `trail_pct` is computed as a fraction **of the ENTRY price**
@@ -36,24 +36,119 @@ Modelled forward at the new geometry on live values: **MFE 1.0R → 0.7560R · 2
 3.0R → 0.7690R.** The documented 0.7500R is exact only when `water_mark == entry`, which never
 happens because **the trail arms at +1R**.
 
-🔴 **THE QUESTION THAT DECIDES WHETHER THIS IS A BUG OR A CALIBRATION ERROR — and it is the FIRST
-thing the optimizer audit must answer:**
+## ✅ ANSWERED 2026-08-06 01:40 — THE GRID MODELLED THE REAL MECHANISM. **1.6875 SURVIVES.**
 
-> **Did the 2026-08-04 grid compute giveback as `pct × entry` or as `pct × water_mark`?**
+The question this section posed — *did the 2026-08-04 grid compute giveback as `pct × entry` or as
+`pct × water_mark`?* — is **`pct × water_mark`**. **G1 is therefore a WRONG LABEL and nothing more.
+§2.53's decision stands and the geometry does not need revisiting.**
 
-- If the grid used **`pct × water_mark`**, it measured the real mechanism and **1.6875 is calibrated
-  against a quantity the engine actually produces** — G1 then reduces to a documentation defect (the
-  label "0.75R" is wrong; the choice is sound).
-- If the grid used **`pct × entry`**, then **1.6875 was chosen against a number the engine does not
-  produce**, and the whole R-axis of §2.53's re-run is offset — by a side-dependent amount that runs
-  in the SAME direction as the LONG-vs-SHORT gap the partial exists to fix.
+**Evidence, three ways** (the 17:05 script is not on disk — see §0.2):
 
-**Until that is answered, do not treat "trail = 0.75R" as a fact anywhere**, and do not re-tune
-`TRAIL_MULT_ATR` on the strength of it. **0 positions have closed on the new geometry**, so nothing
-has yet contradicted the label out loud. Full measurement:
+1. **Source.** Both surviving scripts of that lineage — `geom.py` (16:18, §2.50) and
+   `three_methods.py` (16:45, §2.52) — read
+   `trail_pct = trail_r * (sl_dist / entry) * 100` and then
+   `trig = wm * (1 ∓ trail_pct / 100)`. **Letter-for-letter the engine**, ratchet and breakeven
+   included.
+2. 🔴 **An entry base CANNOT have produced the published table.** Re-run with the trail applied to
+   the entry and every trail width gives the *same* number (2.97/2.97/2.97 at SL 2.0), because the
+   trail arms only at breakeven where the stop is already `entry × 1.002` — an entry-based trigger
+   sits below that forever, `if trig > sl` never fires, and **the trail is inert**. §2.53's published
+   axis *varies* (+6.62 → +4.92 → +2.77). An inert trail cannot produce a varying axis.
+3. **Reconstruction.** §2.50's cells + §2.52's closes basis + truncation at the real close + a fixed
+   `R_ref` reproduces the mech-24 column **exactly** at SL 2.0/0.75R (+6.62) and SL 2.0/1.0R (+4.92),
+   with cohorts coming out **clean = 40 / mech = 24** as labelled. Other cells drift 0.1–2.7R on
+   truncation details that cannot be recovered without the original file — **the trail model is
+   claimed, not a full reproduction.**
+
+🔴 **AND THE SIDE SKEW WAS IN THE GRID.** Replayed inside the grid's own model at the applied cell
+(2.25 / 0.75R): **LONG 0.7615R (+1.53%) · SHORT 0.7195R (−4.07%)** — the same numbers as the live
+book. The decision rule (`geom.py:144`) required **both sides on both cohorts** to improve, so the
+skew was load-bearing rather than invisible. **Both levers were scored on the same mechanism.**
+
+### 🔴 THE CORRECTED FACT — QUOTE THIS SENTENCE, NOT "0.75R"
+
+> **`TRAIL_MULT_ATR / SL_ATR_MULT = 0.75` is the RATIO OF THE CONSTANTS, not the giveback: the trail
+> is a percentage OF THE ENTRY applied TO THE WATER MARK, so the realised giveback is 0.7560R at the
+> arming moment and drifts with MFE — wider on longs, tighter on shorts (measured LONG +1.63% /
+> SHORT −4.09% over 14 trailed exits).**
+
+**"was exactly 1.00R" is wrong the same way:** on all 7 live rows `trail_pct × entry == 1R_price`
+exactly, and those same trails still gave back **1.0160R / 0.9591R** by side.
+
+**Label corrected in `897850b`** at `config.py` (the `TRAIL_MULT_ATR` block, the `SL_ATR_MULT` block
+and the inline comment) and in §2.53 below. Full audit:
+`reports/2026-08-06-0140-titan-optimizer-audited-g1-answered-1.6875-survives-and-the-proposal-is-99-percent-paper.md`.
+Original measurement:
 `reports/2026-08-06-0050-titan-geometry-arithmetic-audited-1R-the-stop-the-trail-and-the-partial.md`.
 
 ---
+
+## 🔴 §0.2 — TWO DIFFERENT MACHINES. `optimizer.py` NEVER CHOSE THE GEOMETRY (2026-08-06 01:40)
+
+**A future session WILL conflate these, because §2.5x does not distinguish them.**
+
+- **`optimizer.py`** is a **segment analyser**: it pairs closed trades, groups them across 24
+  candidate fields, and proposes filtering the worst group. 🔴 **It has NO `SL_ATR_MULT` or
+  `TRAIL_MULT_ATR` lever at all** — neither name appears in the file. **It has never proposed, moved
+  or evaluated a geometry constant, and cannot.**
+- **The 2026-08-04 geometry grid** (§2.50 / §2.52 / §2.53) was **ad-hoc session work in a scratchpad**,
+  written and run by hand.
+
+🔴 **AND THE GRID'S SCRIPTS ARE NOT UNDER VERSION CONTROL.** They live in
+`/tmp/claude-0/-root/<session-uuid>/scratchpad/aa/`. **The script that produced §2.53's published
+table — the one that chose the applied cell — IS ALREADY GONE.** Two neighbours from the same session
+survive and were enough to settle G1 this time; that was luck, not a property of the setup. **This is
+the §2.20 defect in a new place: the artefact that decides a live constant is not in the repository,
+so the reasoning behind an applied number can evaporate while the number keeps trading.** Anything
+that moves a live constant should be committed with the change that applies it.
+
+---
+
+## 🔴 §0.3 — THE OPTIMIZER: WHAT IT PROPOSED FROM PAPER, AND WHAT ITS ONE AUTOMATIC LEVER DOES (2026-08-06 01:55)
+
+**O1/O2 — FIXED in `897850b`, and the seven standing proposals are WITHDRAWN, not pending.**
+The optimizer ranked segments by **raw summed dollars** over a cohort pooling paper with live:
+**30 paper pairs at −$733.38 against 7 live pairs at −$4.15 — 99.4% of the ranking was paper**,
+because a paper position is ~0.15 BTC (~$10k notional) against live's 0.0023 BTC ($150), **68.7×
+larger per trade**. Its output is a filter that **blocks REAL entries**. It produced **seven
+identical proposals** (2026-07-30 → 08-05) to filter `confluence_score < 6.0` — a "segment" covering
+**32 of 37 = 86% of the book**, on bucket edges (6.0/7.5/9.0) calibrated for a scale the bot no
+longer uses (live range 2.25–7.75, gate 3.0). **One had a live CONFIRM button in Telegram.**
+Now: the cohort is **live rows only** (`stop_order_id IS NOT NULL`) and below the 30-gate it says
+**"INSUFFICIENT LIVE DATA"** naming the excluded paper pairs; and `optimizer_listener` **fails
+closed** on any proposal without a `live_evidence` block, requiring a strict majority on **both**
+row count and |PnL| plus ≥8 live pairs. **All seven now refuse; `filters.json` stays empty and is
+still dated 2026-05-16. Nothing was retro-applied.**
+
+🔴 **O3 — RECORDED, DELIBERATELY NOT WIRED AND NOT STOPPED. The weight lever's loop closes on
+nothing, by TWO independent mechanisms.** It is the only thing the optimizer moves **without a
+human**, it moves **every day** (all 26 segments are off 1.0, range 0.2–2.5, last written
+2026-08-05 12:00), and its output reaches **no decision**:
+1. `weight_engine.weighted_adj`'s own docstring: *"…added to direction_score before storing as
+   confluence_score. **Never applied to the gate check.**"* Its only consumer, `adj_score`, is
+   **stored and printed**, never compared to a threshold;
+2. and §0 records that the stored value is then **overwritten with the raw matrix score 154 lines
+   later, on 66 of 66 engine-owned entries**.
+**This is wider than §2.40**, which named only the *combo* weight: **the entire `weighted_adj` output
+is inert.** The weights are also learned from paper-scaled `avg_pnl` (−27.65, +36.57, +43.89 — live
+trades are ±$0.59). **Wiring it or stopping it is a design decision and was not taken in this pass.**
+
+**O4–O8, recorded as measured:** **0 of 5** of §0's contamination filters applied (the sibling grid
+applied two of them on the same table) · **no validation/replay step of any kind** — it never
+reproduces the book, it only aggregates recorded `pnl` · it reads `confluence_score` directly against
+§0's rule, benign *today* only because its cohort is all-`executed` · `virtual_cycle_start_id = 8634`
+while `filters.json` is empty — **the two writes of `apply_proposal` disagree in the stored state**,
+unresolved · `ai_decision` and `tv_tf` are single-valued on 37/37 and can never form a segment.
+**Clean:** it does **not** read the position `atr` column (G5 does not reach it) and `market_regime`
+is populated on every row it sees. Full audit:
+`reports/2026-08-06-0140-titan-optimizer-audited-g1-answered-1.6875-survives-and-the-proposal-is-99-percent-paper.md`.
+
+---
+
+**Since `999572a`:** `897850b` fixes **O1/O2** (live-only cohort + fail-closed CONFIRM guard) and
+corrects the **G1 label** in `config.py`. **No value moved** — all 113 uppercase names in `config.py`
+compare identical; the change is a guard and comment text. Report:
+`reports/2026-08-06-0155-titan-the-confirm-button-refuses-paper-evidence-and-the-trail-label-is-corrected.md`.
 
 **Since `7c2feac`:** `999572a` closes **G3** (the boot re-attach read a hardcoded `'5m'` on a 1h
 geometry — a stop at **0.191×** the intended distance on a live naked position; it now reads
@@ -3555,7 +3650,15 @@ after the EMA envelope gate, the score bar and the advisor is roughly **+0.45 en
 would about **double** today's 0.47/day entry rate. That is the risk class a cascade relaxation
 belongs to, and it is why the brief said propose-and-stop rather than apply.
 
-### 2.53 ✅✅ **THE GEOMETRY IS APPLIED — SL 2.5→2.25, TRAIL 1.00R→0.75R** (2026-08-04 17:01:29 UTC)
+### 2.53 ✅✅ **THE GEOMETRY IS APPLIED — SL 2.5→2.25, TRAIL RATIO 1.00→0.75** (2026-08-04 17:01:29 UTC)
+
+> 🔴 **LABEL CORRECTED 2026-08-06 (see §0.1).** Everywhere this section says "trail 1.00R → 0.75R" it
+> means the **RATIO of the constants**, `TRAIL_MULT_ATR / SL_ATR_MULT`. The **realised giveback** is
+> **0.7560R at the arming moment**, drifting with MFE — wider on longs, tighter on shorts (measured
+> LONG +1.63% / SHORT −4.09% over 14 trailed exits); the old setting's "exactly 1.00R" was likewise
+> **1.0160R / 0.9591R** by side. 🔴 **THE DECISION BELOW IS UNAFFECTED:** the grid modelled this exact
+> mechanism, water-mark base and side skew included, so `1.6875` is calibrated against the quantity
+> the engine produces. Only the name was wrong.
 
 **Both constants in one commit, applied from flat.** `SL_ATR_MULT = 2.25`, `TRAIL_MULT_ATR = 1.6875`
 (= 0.75R), LONG partial unchanged. **The excursion sampler was raised in the same pass: 60 s → 10 s,
