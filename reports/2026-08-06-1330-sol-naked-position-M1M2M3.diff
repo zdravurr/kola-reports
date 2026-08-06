@@ -1,0 +1,518 @@
+--- main.py.bak_nakedposition_M1M2M3_20260806	2026-08-06 12:10:12.131330801 +0000
++++ main.py	2026-08-06 13:19:35.530694783 +0000
+@@ -1893,6 +1893,207 @@
+     return filled, avg
+ 
+ 
++# ── 🔴 2026-08-06 — THE NAKED-POSITION CLASS (M1 / M2 / M3) ───────────────────
++# One shared premise behind all three: THE VENUE IS ON CROSS MARGIN (tradeMode 0,
++# read back from Bybit by hand, OPEN-ITEMS §P3). An unstopped position is therefore
++# NOT bounded by its $20 margin — it draws on the whole wallet balance. Every
++# "at $100 notional an alert is sufficient" judgement in this file was reasoning
++# about an isolated-margin position that does not exist.
++
++class EntryFailSafeError(RuntimeError):
++    """Raised by the entry SL fail-safe. Carries the `trades` status this outcome
++    MUST be recorded under.
++
++    THE POINT IS THE STATUS. Before today the fail-safe `return None`d, and the
++    caller turns None into 'observed_skipped' — the status that everywhere else in
++    this codebase means *the advisor said execute but nothing was sent*. So the
++    worst state this bot can reach (funded, unstopped, emergency close ALSO failed)
++    was indistinguishable in the book from a routine non-event. It is now countable:
++
++        SELECT status, COUNT(*) FROM trades
++         WHERE status LIKE 'sl_failed%' OR status='naked_position_unprotected'
++
++    `naked` marks the branch where we do NOT know the position is flat.
++    """
++
++    def __init__(self, message, *, status, naked):
++        super().__init__(message)
++        self.status = status
++        self.naked  = naked
++
++
++def _record_naked_position(symbol, position_side, *, stage, detail):
++    """Persist a naked/unknown-protection event to its OWN table.
++
++    A Telegram message is not state. The operator reads it on a phone, the process
++    restarts, and nothing on disk remembers that a position may be open with no
++    stop. This row is what _assert_exchange_matches_db_at_boot cross-references, so
++    the alert survives the restart that the alert itself asks the operator to make.
++    Never raises: a bookkeeping failure must not mask the emergency it is recording.
++    """
++    try:
++        with sqlite3.connect(DB_PATH) as conn:
++            conn.execute(
++                "CREATE TABLE IF NOT EXISTS naked_position_alerts ("
++                "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
++                "  ts TEXT, symbol TEXT, position_side TEXT,"
++                "  stage TEXT, detail TEXT, resolved INTEGER DEFAULT 0)"
++            )
++            conn.execute(
++                "INSERT INTO naked_position_alerts(ts, symbol, position_side, stage, detail) "
++                "VALUES (?,?,?,?,?)",
++                (datetime.now(timezone.utc).isoformat(), symbol, position_side,
++                 stage, str(detail)[:2000]),
++            )
++    except Exception as e:                                     # pragma: no cover
++        print(f"{LOG_PREFIX}[NAKED] could not persist alert: {e}", flush=True)
++
++
++def _sl_failsafe(symbol, position_side, *, attempted_sl):
++    """The stop could not be set. Emergency-close, then CLASSIFY the outcome.
++
++    🔴 M2. This ALWAYS raises — there is no outcome here that may share a return
++    value with "no order was placed". Three distinct statuses:
++
++      • naked_position_unprotected — the emergency close raised. Either
++        _execute_close_position hit POS_UNKNOWN (a single Tor blip is enough; it
++        raises rather than closing blind — correct, and it lands here) or the close
++        order itself failed. WE DO NOT KNOW THE POSITION IS FLAT and we DO know it
++        has no stop. Loud Telegram + a durable row.
++      • sl_failed_position_closed — the close succeeded. Contained, still not routine.
++      • sl_failed_no_position     — the venue reports FLAT: the entry never filled,
++        so nothing was ever naked. Benign, and now visible instead of silent.
++    """
++    print(f"{LOG_PREFIX}[SL-FAIL-SAFE] SL failed 3× (attempted {attempted_sl}) — "
++          f"emergency market close of {position_side}", flush=True)
++    send_tg(f"🚨 <b>SL FAILED 3×</b> — emergency close of {position_side} {symbol}\n"
++            f"The stop could not be set at {attempted_sl}. Closing the position now.")
++    try:
++        res = _execute_close_position(symbol, position_side, reason='sl_failsafe')
++    except Exception as ec:
++        # 🔴 THE WORST STATE THIS BOT CAN REACH.
++        _record_naked_position(symbol, position_side, stage='sl_failsafe_close_failed',
++                               detail=f'attempted_sl={attempted_sl} err={ec}')
++        print(f"{LOG_PREFIX}[SL-FAIL-SAFE] 🔴 emergency close FAILED: {ec}", flush=True)
++        send_tg(f"🔴🔴🔴 <b>NAKED POSITION — EMERGENCY CLOSE FAILED</b>\n"
++                f"{symbol} {position_side}\n"
++                f"The stop could NOT be set (3 attempts) and the emergency close "
++                f"then FAILED too: <code>{str(ec)[:200]}</code>\n"
++                f"<b>A funded position may be OPEN on Bybit with NO STOP.</b>\n"
++                f"🔴 The account is on <b>CROSS margin</b> — the exposure is the "
++                f"wallet balance, not the $100 notional.\n"
++                f"🔴 <b>NOTHING WILL FIX THIS BY ITSELF.</b>\n"
++                f"<b>Do now:</b> 1) open Bybit, check for a {position_side} position "
++                f"on {symbol}; 2) if it exists, set a stop or close it BY HAND; "
++                f"3) the bot will not manage it.")
++        raise EntryFailSafeError(
++            f'SL failed and emergency close failed for {symbol} {position_side}: {ec}',
++            status='naked_position_unprotected', naked=True) from ec
++
++    if res is None:
++        # POS_FLAT — _execute_close_position's "no position" return. The entry order
++        # did not leave a position, so there was never anything to protect.
++        print(f"{LOG_PREFIX}[SL-FAIL-SAFE] venue reports FLAT — no position was "
++              f"open; nothing was naked", flush=True)
++        send_tg(f"⚠️ <b>SL failed 3×</b> {symbol} {position_side}\n"
++                f"The emergency close found <b>no position on the venue</b> — the "
++                f"entry did not leave one. Nothing is unprotected. No action needed.")
++        raise EntryFailSafeError(
++            f'SL failed for {symbol} {position_side}; venue FLAT, no position existed',
++            status='sl_failed_no_position', naked=False)
++
++    send_tg(f"⚠️ <b>SL failed 3× — position CLOSED</b> {symbol} {position_side}\n"
++            f"The stop could not be set, so the position was emergency-closed at "
++            f"{res.get('fill_price')}. Nothing is unprotected.")
++    raise EntryFailSafeError(
++        f'SL failed for {symbol} {position_side}; position emergency-closed',
++        status='sl_failed_position_closed', naked=False)
++
++
++# Sides the boot check found on the venue with no row describing them. The entry
++# path refuses to add to a side we already cannot account for.
++_BOOT_ORPHAN_SIDES = set()
++
++
++def _assert_exchange_matches_db_at_boot(symbol):
++    """🔴 M1(d) — READ THE VENUE AT BOOT AND REFUSE TO START QUIET.
++
++    THE GAP THIS CLOSES. Both existing reconcilers read the DATABASE:
++    _reconcile_open_virtual_positions does `SELECT … FROM virtual_positions` and
++    never INSERTs; _reconcile_active_positions starts from active_positions and
++    returns early when it is empty — exactly the state left by an entry that could
++    not be booked. So a Bybit position with no DB row was invisible FOREVER: no
++    restart adopted it, and the only control was a Telegram message. Titan carries
++    assert_exchange_matches_db_at_boot for precisely this; SOL had no counterpart.
++
++    WHAT IT DOES NOT DO: it does not fabricate a virtual_positions row. Adopting a
++    position means inventing its entry price, its 1R, its breakeven and its partial
++    leg from data we do not have — the same fabrication _read_entry_fill refuses.
++    It makes the position VISIBLE and BLOCKS the side, which is the honest half.
++
++    ON A FAILED READ IT REPORTS UNKNOWN, NEVER CLEAN. Concluding "no orphans" from
++    a read that failed is the F1 defect this codebase already fixed everywhere else.
++    """
++    _BOOT_ORPHAN_SIDES.clear()
++    state_by_side = {}
++    try:
++        positions = tor_retry.with_socks_retry(
++            exchange, lambda ex: ex.fetch_positions([symbol]),
++            label='positions.bootassert')
++    except Exception as e:
++        print(f"{LOG_PREFIX}[BOOT-ASSERT] venue read FAILED ({e}) — state UNKNOWN. "
++              f"NOT claiming clean.", flush=True)
++        send_tg(f"⚠️ <b>Boot check inconclusive</b> ({symbol})\n"
++                f"The exchange could not be read at boot, so it is <b>unknown</b> "
++                f"whether a position exists without a database row. This is not a "
++                f"clean start — it is an unread one.")
++        return
++
++    for p in positions:
++        if float(p.get('contracts') or 0) <= 0:
++            continue
++        state_by_side[(p.get('side') or '').upper()] = p
++
++    if not state_by_side:
++        print(f"{LOG_PREFIX}[BOOT-ASSERT] venue FLAT for {symbol} — no orphan "
++              f"possible", flush=True)
++        return
++
++    with sqlite3.connect(DB_PATH) as conn:
++        rows = conn.execute(
++            "SELECT position_side FROM virtual_positions "
++            "WHERE symbol=? AND status='open' AND COALESCE(is_paper,1)=0",
++            (symbol,),
++        ).fetchall()
++        booked = {r[0] for r in rows}
++        booked |= {r[0] for r in conn.execute(
++            "SELECT position_side FROM active_positions WHERE symbol=?", (symbol,)
++        ).fetchall()}
++
++    for side_name, pos in state_by_side.items():
++        if side_name in booked:
++            print(f"{LOG_PREFIX}[BOOT-ASSERT] {side_name} open on venue and booked "
++                  f"in the DB — consistent", flush=True)
++            continue
++        _BOOT_ORPHAN_SIDES.add(side_name)
++        _sl = (pos.get('info') or {}).get('stopLoss') or ''
++        has_stop = bool(_sl) and str(_sl) not in ('0', '0.0', '')
++        detail = (f"contracts={pos.get('contracts')} entry={pos.get('entryPrice')} "
++                  f"stopLoss={_sl or 'NONE'}")
++        _record_naked_position(symbol, side_name, stage='boot_orphan', detail=detail)
++        print(f"{LOG_PREFIX}[BOOT-ASSERT] 🔴 ORPHAN: {side_name} open on venue with "
++              f"NO database row — {detail}", flush=True)
++        send_tg(f"🔴 <b>ORPHAN POSITION ON THE VENUE</b> ({symbol} {side_name})\n"
++                f"A position is open on Bybit that <b>no database row describes</b>. "
++                f"The bot is NOT managing it and will not close it.\n"
++                f"<code>{detail}</code>\n"
++                f"Stop on the venue: <b>{'YES — ' + str(_sl) if has_stop else '🔴 NONE'}</b>\n"
++                f"🔴 Account is on <b>CROSS margin</b>: an unstopped position draws on "
++                f"the whole wallet balance.\n"
++                f"<b>New {side_name} entries are BLOCKED</b> until this is resolved by "
++                f"hand (set a stop, or close it, then restart).")
++
++
+ def _execute_single_entry(symbol, side, position_side, row_id=None, clusters=None):
+     """One market order + ATR-based SL + trailing stop. No DCA grid.
+ 
+@@ -1921,6 +2122,19 @@
+             label='paper_entry',
+         )
+ 
++    # 🔴 M1(d) — an orphan the boot check found is a REFUSAL, not a note. Without
++    # this the alert is advisory and the bot happily stacks a second position onto a
++    # side it already cannot account for, under CROSS margin, with MAX_POSITIONS_
++    # PER_SIDE=1 unable to see the first one because it counts DB rows.
++    if position_side in _BOOT_ORPHAN_SIDES:
++        print(f"{LOG_PREFIX}[BOOT-ASSERT] entry REFUSED — {position_side} has an "
++              f"unaccounted position on the venue", flush=True)
++        send_tg(f"🚫 <b>Entry refused</b> ({symbol} {position_side})\n"
++                f"The venue holds a {position_side} position that no database row "
++                f"describes (found at boot). The bot will not add to a side it "
++                f"cannot account for. Resolve it by hand and restart.")
++        return None
++
+     ticker        = tor_retry.with_socks_retry(exchange, lambda ex: ex.fetch_ticker(symbol), label='ticker.entry')
+     current_price = float(ticker['last'])
+ 
+@@ -1972,6 +2186,48 @@
+                 f"NO second order was placed. <b>Check the position and its stop "
+                 f"manually</b> (idem <code>{_idem_entry}</code>).")
+         raise
++    # ── 🔴 M1 2026-08-06 — PROTECT BEFORE DESCRIBE ───────────────────────────
++    # THE ORDER OF THESE TWO STEPS WAS THE DEFECT. It used to be: read the fill,
++    # and only if that succeeded, place the stop (~50 lines below). So a single
++    # unretried Tor timeout on one fetch_order — tor_retry retries 403s ONLY, its
++    # own docstring says timeouts are NOT retried — raised past the stop and left a
++    # funded, UNSTOPPED position that no restart adopts. Under CROSS margin the
++    # exposure is the wallet balance.
++    #
++    # WHY THE REORDER IS EVEN POSSIBLE: SOL's stop is a POSITION-LEVEL
++    # /v5/position/trading-stop — a SET on the position, not an appended order. It
++    # needs NO size and no side, so it does NOT need the fill. Titan's stop is an
++    # order and could not do this; SOL's can.
++    #
++    # WHAT THE PROVISIONAL LEVEL DERIVES FROM: `current_price`, the PRE-TRADE
++    # TICKER already in hand. Chosen over the venue's avgPrice and over a re-read
++    # because both are NETWORK READS, and the whole failure mode being fixed is a
++    # network read that fails — a stop that needs a successful read to exist
++    # reintroduces the defect it is meant to close. compute_initial_sl is pure and
++    # `clusters` is the 60s-cached snapshot, so this whole computation adds NO call.
++    # The error is one market order's slippage against a 2.5×ATR stop, and it is
++    # replaced by the exact fill-derived level the moment the fill IS readable.
++    #
++    # A POSITION THAT EXISTS MUST BE PROTECTED WHETHER OR NOT WE CAN DESCRIBE IT.
++    _prov_sl, _prov_route = compute_initial_sl(
++        position_side, current_price, atr, clusters,
++        round_price=lambda p: float(exchange.price_to_precision(symbol, p)),
++    )
++    close_side = 'sell' if position_side == 'LONG' else 'buy'
++    sl_id = tp_id = None
++    # _place_sl_with_retry retries 3× with backoff (0.5s/1.0s), which also covers
++    # the brief window in which a just-filled market order has not yet registered
++    # as a position the trading-stop endpoint will accept.
++    sl_id = _place_sl_with_retry(symbol, close_side, _prov_sl, amount, pos_idx,
++                                 position_side, idem_key=f'sol-sl-{row_id}'[:36])
++    if sl_id is None:
++        # M2 — always raises, with a status of its own. See _sl_failsafe.
++        _sl_failsafe(symbol, position_side, attempted_sl=_prov_sl)
++    sl_price = _prov_sl
++    print(f"{LOG_PREFIX}[SL] PROVISIONAL stop set from pre-trade ticker "
++          f"{current_price} → {_prov_sl} (route={_prov_route}) BEFORE reading the "
++          f"fill — position is protected", flush=True)
++
+     # PHASE 3 (1): book from what the VENUE actually did, not from what we asked for.
+     filled_amt, avg_px = _read_entry_fill(order, symbol, want=amount,
+                                           fallback_px=current_price)
+@@ -1988,22 +2244,36 @@
+         # So nothing adopts the position on any restart. RECOVERY IS MANUAL, and the
+         # alert must say so — an alert that promises a mechanism that is not there is
+         # worse than one that admits the gap, because the operator waits for it.
+-        # Building the exchange-adoption path is recorded as an OPEN ITEM, deliberately
+-        # not done here: it is a separate piece with its own risk, and at $100 notional
+-        # naming the state is sufficient.
++        #
++        # 🔴 2026-08-06 (M1) — WHAT CHANGED. Two things, and the second is the fix:
++        #  1. THE POSITION IS ALREADY STOPPED when we arrive here. The stop was set
++        #     above, before this read, at the provisional level. The old text's
++        #     "may be OPEN and UNSTOPPED" is no longer the state, so it no longer
++        #     says that — an alert that overstates is as bad as one that understates.
++        #  2. _assert_exchange_matches_db_at_boot now reads the EXCHANGE at boot, so
++        #     the next restart DOES surface this position and blocks the side. It
++        #     still does not adopt it — adopting means inventing an entry price, a
++        #     1R and a partial leg we do not have, which is the very fabrication
++        #     this branch exists to refuse.
++        # REFUSING TO BOOK NO LONGER MEANS REFUSING TO PROTECT. That was the defect.
++        _record_naked_position(symbol, position_side, stage='entry_fill_unreadable',
++                               detail=f'provisional_sl={sl_price} order_id='
++                                      f'{(order or {}).get("id")}')
+         send_tg(f"🚨 <b>ENTRY FILL UNREADABLE</b> ({symbol} {position_side})\n"
+                 f"The order was sent but its fill could NOT be read, so the position "
+                 f"was NOT booked from a guess.\n"
+-                f"<b>A position may be OPEN and UNSTOPPED on Bybit.</b>\n"
+-                f"🔴 <b>NOTHING WILL FIX THIS BY ITSELF — recovery is MANUAL.</b> No "
+-                f"restart adopts it: the boot reconcilers read the database, not the "
+-                f"exchange, and this failure leaves no row for them to read.\n"
+-                f"<b>Do now:</b> 1) open Bybit and check whether a {position_side} "
+-                f"position exists on {symbol}; 2) if it does, verify it has a stop and "
+-                f"set one if not; 3) close it by hand or leave it stopped — the bot "
+-                f"will NOT manage it and will not close it.")
++                f"✅ <b>It IS protected</b> — a stop is on the exchange at "
++                f"<b>{sl_price}</b>, set before this read for exactly this case.\n"
++                f"🔴 <b>But the bot will NOT manage it</b>: with no row it gets no "
++                f"breakeven move, no partial, no trail recompute and no close. The "
++                f"next restart will SEE it and block new {position_side} entries, but "
++                f"it will not adopt it. <b>Recovery is MANUAL.</b>\n"
++                f"<b>Do now:</b> 1) open Bybit and check the {position_side} position "
++                f"on {symbol}; 2) confirm its stop reads {sl_price}; 3) close it by "
++                f"hand, or leave it to stop out.")
+         raise RuntimeError(f'entry fill unreadable for {symbol} {position_side} '
+-                           f'— refusing to book a fabricated position')
++                           f'— refusing to book a fabricated position '
++                           f'(position IS stopped at {sl_price})')
+     if abs(filled_amt - amount) > 1e-9:
+         print(f"{LOG_PREFIX}[ENTRY] PARTIAL FILL: requested {amount}, filled "
+               f"{filled_amt} — booking the FILLED size", flush=True)
+@@ -2027,10 +2297,40 @@
+     # legacy SL_BUFFER_ATR×ATR (the flag-OFF branch of compute_initial_sl is
+     # byte-identical to the old inline formula). Reuses `clusters` already
+     # fetched by the webhook handler (60s cache) — NO new exchange call here.
+-    sl_price, _sl_route = compute_initial_sl(
++    #
++    # 🔴 M1 — THE EXACT LEVEL, NOW THAT THE FILL IS KNOWN. The LEVEL is unchanged:
++    # this is the same compute_initial_sl call on the same inputs it always had.
++    # What changed is that it is no longer the FIRST stop — it REPLACES the
++    # provisional one set above. A position-level trading-stop is a SET, so
++    # re-setting costs one idempotent call and cannot produce a second stop.
++    _exact_sl, _sl_route = compute_initial_sl(
+         position_side, fill_price, atr, clusters,
+         round_price=lambda p: float(exchange.price_to_precision(symbol, p)),
+     )
++    if abs(_exact_sl - sl_price) > 1e-12:
++        if _move_stop_to(symbol, position_side, _exact_sl, label='entry-sl-exact'):
++            print(f"{LOG_PREFIX}[SL] provisional {sl_price} → EXACT {_exact_sl} "
++                  f"(fill {fill_price})", flush=True)
++            sl_price = _exact_sl
++        else:
++            # DELIBERATELY NOT an emergency close, and the reason is the same one
++            # _move_stop_to's own docstring gives: the provisional stop is STILL ON
++            # THE VENUE. The position is protected, at a level derived from the
++            # pre-trade ticker instead of the fill — a slippage-sized difference,
++            # never absent. `sl_price` therefore keeps the PROVISIONAL value so the
++            # DB, the card and the engine all record what is actually on the venue.
++            print(f"{LOG_PREFIX}[SL] exact re-set FAILED — keeping PROVISIONAL "
++                  f"{sl_price} (venue stop unchanged, position still protected)",
++                  flush=True)
++            send_tg(f"⚠️ <b>Stop kept at the provisional level</b> {symbol} "
++                    f"{position_side}\n"
++                    f"The position <b>IS protected</b> — its stop is on the exchange "
++                    f"at <b>{sl_price}</b>. The refinement to the fill-derived level "
++                    f"({_exact_sl}) failed, so the stop sits a slippage's width from "
++                    f"the intended price. <b>No action is required for safety.</b>")
++    else:
++        print(f"{LOG_PREFIX}[SL] exact level equals the provisional {sl_price} — "
++              f"no re-set needed", flush=True)
+     _sl_dist_pct = abs(fill_price - sl_price) / fill_price * 100 if fill_price else 0.0
+     _sl_wall_px  = None
+     if _sl_route == 'wall':
+@@ -2052,22 +2352,12 @@
+     active_price = float(exchange.price_to_precision(symbol, raw_active))
+     market_id    = exchange.market(symbol)['id']          # 'SOLUSDT' — required by trading-stop API
+ 
+-    close_side = 'sell' if position_side == 'LONG' else 'buy'
+-    sl_id = tp_id = None
+-
+-    # Stop-loss order with retry (3 attempts, exponential backoff).
+-    sl_id = _place_sl_with_retry(symbol, close_side, sl_price, amount, pos_idx,
+-                                 position_side, idem_key=f'sol-sl-{row_id}'[:36])
+-    if sl_id is None:
+-        # All 3 attempts failed — emergency close to avoid naked position.
+-        print(f"{LOG_PREFIX}[SL-FAIL-SAFE] SL failed 3× — emergency market close of {position_side}",
+-              flush=True)
+-        send_tg(f"🚨 <b>SL FAILED 3×</b> — emergency close of {position_side} {symbol}")
+-        try:
+-            _execute_close_position(symbol, position_side)
+-        except Exception as ec:
+-            print(f"{LOG_PREFIX}[SL-FAIL-SAFE] emergency close failed: {ec}", flush=True)
+-        return None
++    # 🔴 M1 — THE STOP-PLACEMENT BLOCK THAT STOOD HERE HAS MOVED UP, above the fill
++    # read. `close_side`, `sl_id`/`tp_id` and the fail-safe now live there; this is
++    # the only place they used to be set, so nothing below is left undefined. The
++    # old inline fail-safe (`print` on close failure, `return None` → the caller's
++    # 'observed_skipped') is replaced by _sl_failsafe, which alerts and raises with
++    # a status of its own — see M2.
+ 
+     # Trailing stop via position/trading-stop (retry 3×).
+     tp_id = _place_trail_with_retry(symbol, market_id, pos_idx, trail_cb, active_price)
+@@ -2188,10 +2478,43 @@
+     close_amount = float(pos['contracts'])
+     close_side   = 'sell' if position_side == 'LONG' else 'buy'
+ 
+-    _cancel_open_orders_for_side(symbol, position_side)
+-
+-    ticker        = tor_retry.with_socks_retry(exchange, lambda ex: ex.fetch_ticker(symbol), label='ticker.close')
+-    current_price = float(ticker['last'])
++    # ── M3 2026-08-06 — CLOSE FIRST, CANCEL AFTER ────────────────────────────
++    # THE ORDER USED TO BE: _cancel_open_orders_for_side → fetch_ticker → close.
++    #
++    # 🔶 BE PRECISE ABOUT WHAT THIS DID AND DID NOT FIX. The 13:00 audit rated this
++    # as a naked window — "the protective stop goes at 2191". PROVEN BY EXECUTION
++    # NOT TO BE, and the reason is the B1 change: since the stop became a
++    # POSITION-LEVEL /v5/position/trading-stop attribute it is NOT AN ORDER, and
++    # _cancel_open_orders_for_side reaches only orders. It calls fetch_open_orders
++    # with no params, which ccxt sends as orderFilter='Order' (verified in the
++    # installed 4.5.52) — conditional/stop orders are not even returned, which is
++    # the same fact _cancel_stop_orders' own docstring records from the other side.
++    # Run against the pre-fix file, the stop survives the cancel: the position was
++    # NOT unprotected across this gap. The audit's premise was inherited from the
++    # pre-B1 era, when the SL genuinely was a conditional order.
++    #
++    # WHY REORDER ANYWAY — two real, smaller reasons:
++    #  1. the gap between _fetch_position_state (which established `close_amount`)
++    #     and the close spanned up to three Tor round-trips against a link with a
++    #     measured 403 rate (285 SOCKS retries / 26 CloudFront 403s in two days).
++    #     The longer that gap, the likelier the position stopped out underneath us
++    #     and `close_amount` is stale. Shrinking it is a real improvement;
++    #  2. it stops the ordering from being load-bearing on a fact that could change.
++    #     If a stop ever becomes an order again, or any protective order is added,
++    #     the old sequence becomes a genuine naked window silently. This one cannot.
++    #
++    # WHY THE REORDER IS SAFE: the close is reduceOnly, so it cannot open or flip
++    # anything. Once it returns the position is flat, and the cancels below can only
++    # reach orders that are now no-ops. Both cancels still run. The failure mode
++    # inverts: a cancel that now fails leaves an ORPHANED STOP on a flat position
++    # (harmless; _smart_boot_cleanup sweeps it at the next boot).
++    #
++    # NOT MODE-GUARDED. The paper branch returned at the top of this function, so
++    # everything from here down is the live path by construction; the reordering is
++    # unconditional within it and adds no test of OBSERVATION_MODE. Leaning on the
++    # mode guard would be wrong: this code IS what runs at the flip.
++    #
++    # The fetch_ticker that stood here is gone from the critical path — see below.
+ 
+     # 2026-08-01 Phase 1 (2b): 'reduce_only' (snake_case) is NOT read by ccxt's
+     # bybit module — it reads 'reduceOnly' ONLY (18 refs vs 0), and the base class
+@@ -2211,9 +2534,31 @@
+                     'positionIdx': 1 if position_side == 'LONG' else 2,
+                     'clientOrderId': k},
+         ), label='create_market_order.close', idem_key=_idem)
+-    fill_price = float(
+-        (order or {}).get('average') or (order or {}).get('price') or current_price
+-    )
++
++    # ── M3 — THE POSITION IS NOW FLAT. Everything protective can go. ──────────
++    _cancel_open_orders_for_side(symbol, position_side)
++
++    # 🔴 M3(b) — THE TICKER WAS NEVER NEEDED TO SEND A MARKET CLOSE. It fed exactly
++    # one thing: `current_price`, the LAST fallback for fill_price when the order
++    # dict carries neither `average` nor `price`. It is therefore moved AFTER the
++    # close AND made conditional — the common path (a market order that returns its
++    # average) now makes NO ticker call at all, and the rare path pays for it only
++    # when it has nothing better. A read that a fallback needs must never sit on the
++    # far side of the moment the position is unprotected.
++    fill_price = float((order or {}).get('average') or (order or {}).get('price') or 0) or None
++    if fill_price is None:
++        try:
++            ticker     = tor_retry.with_socks_retry(
++                exchange, lambda ex: ex.fetch_ticker(symbol), label='ticker.close')
++            fill_price = float(ticker['last'])
++            print(f"{LOG_PREFIX}[CLOSE] order carried no fill price — using ticker "
++                  f"{fill_price} as a LABELLED estimate", flush=True)
++        except Exception as e:
++            # The close ALREADY HAPPENED. Failing to price it must not raise past a
++            # successful close and make the caller believe the position is still open.
++            fill_price = float(pos.get('markPrice') or pos.get('entryPrice') or 0) or 0.0
++            print(f"{LOG_PREFIX}[CLOSE] fill price unreadable ({e}) — falling back to "
++                  f"the position snapshot {fill_price}", flush=True)
+     fee_cost = None
+     if (order or {}).get('id'):
+         try:
+@@ -3447,6 +3792,23 @@
+     try:
+         entry = _execute_single_entry(symbol, side, position_side, row_id=row_id,
+                                       clusters=_clusters)
++    except EntryFailSafeError as e:
++        # 🔴 M2 — THIS MUST NOT LOOK ROUTINE. The SL fail-safe used to `return None`,
++        # and `entry is None` below records status='observed_skipped' — the status
++        # that everywhere else means the advisor said execute but NOTHING WAS SENT.
++        # An order WAS sent here. Each outcome now gets its own status
++        # (naked_position_unprotected / sl_failed_position_closed /
++        # sl_failed_no_position) so the worst state this bot can reach is countable
++        # in one query and cannot be read as a non-event. Telegram was already sent
++        # by the fail-safe, which knows which of the three happened.
++        update_trade(row_id, status=e.status, error=str(e), combo_key=combo,
++                     confluence_score=direction_score,
++                     matrix_direction=matrix_result['direction'],
++                     matrix_breakdown_json=matrix_bkdn_json)
++        print(f"{LOG_PREFIX}[SL-FAIL-SAFE] recorded status={e.status} naked={e.naked} "
++              f"row={row_id}: {e}", flush=True)
++        return jsonify({'status': e.status, 'naked': e.naked,
++                        'message': str(e), 'combo': combo}), 500
+     except Exception as e:
+         err = str(e)
+         update_trade(row_id, status='failed', error=err, combo_key=combo,
+@@ -4563,6 +4925,11 @@
+ # Must run after _smart_boot_cleanup so the registry reflects post-cleanup state.
+ _load_active_positions_from_db()
+ 
++# 🔴 M1(d) — the only boot step that reads the EXCHANGE rather than the database.
++# Runs last, so it judges the fully reconciled DB state: anything the venue holds
++# that no row describes is a genuine orphan, not a race with the loaders above.
++_assert_exchange_matches_db_at_boot(DEFAULT_SYMBOL)
++
+ # ── Webhook route ─────────────────────────────────────────────────────────────
+ @app.route('/webhook/sol', methods=['POST'])
+ def webhook():
