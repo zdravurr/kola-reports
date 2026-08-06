@@ -10,10 +10,17 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `38cd64c`, re-verified by `git rev-parse` at 2026-08-06 00:12 UTC** — and every value in
+🔴 **HEAD `7c2feac`, re-verified by `git rev-parse` at 2026-08-06 00:32 UTC** — and every value in
 this header and in the current-state table below was re-read by **importing `config` at runtime in the
 same pass**, not copied forward. The previous header read `44731be`, which was **12 commits stale**
 because body edits never refreshed it; see the correction in §0.0 and the guard in §2.58.
+
+**Since `38cd64c`:** `7c2feac` closes **F2** (deterministic `clientOrderID` **plus** a pre-retry
+exchange check that adopts an existing stop — see the boxed correction in §1a) and **F9c** (the
+degraded P3 close now **alerts and sends nothing** instead of betting a placeholder quantity on an
+untested `closePosition` behaviour). 7 functions changed, 2 added; no gate, geometry value, score
+bar, prompt or schema moved. Report:
+`reports/2026-08-06-0030-titan-f2-closed-idempotency-key-plus-preretry-exchange-check.md`.
 
 **Since `22a085e`:** `acf579e` carries the four money-path fixes F1/F3/F4/F7 from the 23:20
 order-adapter audit (its message is the midnight cron's generic backup text — it fired while the
@@ -593,6 +600,49 @@ It is reachable only from `_poll_once` handling a `breakeven_jobs` row, and:
 
 ⇒ **Exactly ONE `closePosition` order exists at any moment**: the item-11 `STOP_MARKET` (at
 breakeven it is cancelled and recreated, one at a time). Two cannot coexist.
+
+> 🔴 **THAT CONCLUSION WAS INCOMPLETE WHEN IT WAS WRITTEN, AND IS NOW EARNED A SECOND WAY
+> (2026-08-06, `7c2feac`). READ THIS BEFORE QUOTING THE LINE ABOVE.**
+>
+> **The gap.** The three numbered points enumerate **CREATION SITES**. They never ask whether **ONE
+> SITE CAN CREATE TWO ORDERS FROM ONE LOGICAL CALL** — and it could.
+> `breakeven_worker._place_stop_with_retry` retried three times with **no idempotency key and no
+> post-failure check**, so a failure returned *after* the order reached BingX's matching engine (a
+> timeout, a dropped response, a 5xx on the way back) made attempt 2 place a **second
+> `STOP_MARKET closePosition='true'`**. Only the second id was returned and stored in
+> `virtual_positions.stop_order_id`; the first was **invisible to the bot** and survived every later
+> `move_stop`, which cancels only the recorded id. The claim was about *sites*; the risk was about
+> *attempts*. **Reproduced by execution:** on a venue that books the order and then fails the
+> response, the old loop ends with **TWO** `closePosition` stops on one position.
+>
+> **WHAT IS ACTUALLY GUARANTEED NOW, and by which mechanism.** Two independent mechanisms, and the
+> second does not rest on the first:
+>
+> | # | mechanism | what it rests on | proven? |
+> |---|---|---|---|
+> | 1 | **THE KEY** — a deterministic `clientOrderID` (`titan-sl-<20 hex>`, 29 chars) over (symbol, side, stop_price, anchor), **identical across all three attempts** | BingX **enforcing** uniqueness on `clientOrderID` | 🔴 **NO — and it cannot be proven without sending two real orders.** Only that the field is **ACCEPTED** is proven, on the real signed request. |
+> | 2 | **THE CHECK** — before every retry, and once more after the final failure, `_find_existing_stop` asks the exchange whether a protective stop for this position already exists and **ADOPTS** it instead of sending | only reads the bot **already performs at boot** (`_probe_stop_orders`: `fetch_open_orders` + raw `swapV2PrivateGetTradeOpenOrders`, unioned) and `MAX_POSITIONS_PER_SIDE = 1` + `ux_vpos_one_open_per_side` | ✅ **YES, by execution** — one order on the book where the old loop left two |
+>
+> **Mechanism 2 is the load-bearing one.** It was built precisely because mechanism 1 rests on an
+> unproven venue behaviour, and a retry guard resting on an unproven venue behaviour is the same shape
+> as every *"reads as armed"* defect found this week. Evidence is taken in two forms — an open order
+> carrying **our** client id (proof our attempt landed), or **any** live
+> `STOP_MARKET closePosition='true'` on that `positionSide`, which is sound because at most **one**
+> position can exist per side.
+>
+> **When the CHECK itself cannot answer, NOTHING IS SENT.** An unknown check result never licenses a
+> second placement: it returns failure into the caller's existing invariant (`place_stop` and
+> `move_stop_with_race_guard` fire the emergency close; `_reconcile_side` alerts MANUAL ACTION) and
+> alerts the operator. There is a designed response to *"cannot protect"*; there is none to
+> *"silently protected twice"*.
+>
+> **SO THE HONEST STATEMENT OF THE CLAIM IS:** *exactly one `closePosition` order exists at any
+> moment* — guaranteed by **construction** for the trail door (the three points above, unchanged),
+> and by **an exchange-state check before every retry** for the retry door, **not** by trusting BingX
+> to dedupe. **Still open:** whether BingX rejects a duplicate `clientOrderID`. If that is ever
+> established, mechanism 1 becomes a second independent guarantee; until then it is a belt whose
+> braces do the work. Report:
+> `reports/2026-08-06-0030-titan-f2-closed-idempotency-key-plus-preretry-exchange-check.md`.
 
 🔴 **THE WARNING STANDS, DO NOT DELETE IT:** implementing the exchange trail brings this straight
 back. `_attempt_trail` creates the `TRAILING_STOP_MARKET` and **never cancels the breakeven
