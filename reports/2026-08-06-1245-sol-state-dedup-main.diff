@@ -1,0 +1,55 @@
+--- main.py.bak_statededup_20260806	2026-08-05 00:21:24.236155393 +0000
++++ main.py	2026-08-06 12:10:12.131330801 +0000
+@@ -697,6 +697,14 @@
+             ('ai_user_prompt',           'TEXT'),
+             ('ai_raw_response',          'TEXT'),
+             ('ai_model',                 'TEXT'),
++            # 2026-08-06 — STATE-DEDUP VISIBILITY. NULL on a normal consultation; a JSON
++            # object when this row's verdict was REUSED from an earlier call in the same
++            # market state. Not optional: a reused row stamps the prompt that PRODUCED
++            # the verdict (the 2026-08-01 provenance rule), so without this column it is
++            # indistinguishable from a fresh consultation and the next audit mis-counts
++            # model calls — the same way the 2026-08-05 skip-volume audit nearly did.
++            # A measurement that cannot see itself is the defect, not the saving.
++            ('ai_verdict_reuse_json',    'TEXT'),
+             # 4C-2 news_sentiment (additive; for advisor context + optimizer learning)
+             ('news_summary',             'TEXT'),
+             ('news_pos',                 'INTEGER'),
+@@ -3234,6 +3242,29 @@
+             f"{_tf_line}\n"
+             f"<code>{combo}</code>"
+         )
++    # ── 2026-08-06 — MAKE THE REUSE COUNTABLE ────────────────────────────
++    # `ai_user_prompt` below keeps naming the prompt that ACTUALLY produced the
++    # verdict — the rule established on 2026-08-01, when 31 stored decisions named
++    # a prompt that did not produce them and 7 of those became positions carrying
++    # -$742.67. That rule is why a reused row looks ordinary, and why THIS column
++    # has to exist: it carries the reuse facts AND this row's own rendering, so
++    # nothing is lost and nothing lies about what the model was shown.
++    # NULL whenever the verdict came from a real call (including the bypass path,
++    # which synthesises `advice` and never sets these keys).
++    _reuse = advice.get('verdict_reused')
++    _reuse_from = advice.get('verdict_reused_from') or {}
++    _reuse_json = json.dumps({
++        'reused':               1,
++        'age_s':                advice.get('verdict_reused_age_s'),
++        'from_5m':              _reuse_from.get('trigger_5m'),
++        'from_at':              _reuse_from.get('at'),
++        'rendered_user_prompt': advice.get('rendered_user_prompt'),
++    }) if _reuse else None
++    if _reuse:
++        print(f"{LOG_PREFIX}[STATE-CACHE] row={row_id} verdict REUSED "
++              f"age={advice.get('verdict_reused_age_s')}s "
++              f"decided_on_5m={_reuse_from.get('trigger_5m')!r} — no model call",
++              flush=True)
+     # Persist the verdict on the trade row (commit-1 columns) regardless of
+     # outcome, so DRYRUN/fail-open passes are replayable by the optimizer.
+     update_trade(row_id, ai_decision=ai_decide,
+@@ -3243,6 +3274,7 @@
+                  ai_user_prompt=advice.get('user_prompt'),
+                  ai_raw_response=advice.get('raw'),
+                  ai_model=advice.get('model'),
++                 ai_verdict_reuse_json=_reuse_json,
+                  # Divergence B: the combo weight the advisor saw, so the
+                  # audit loop / optimizer can replay it (Titan parity).
+                  weight_used=_combo_weight)
