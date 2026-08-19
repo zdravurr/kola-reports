@@ -10,10 +10,49 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `897850b`, re-verified by `git rev-parse` at 2026-08-06 01:58 UTC** — and every value in
+🔴 **HEAD `4c1ab56`, re-verified by `git rev-parse` at 2026-08-19 20:45 UTC** — and every value in
 this header and in the current-state table below was re-read by **importing `config` at runtime in the
 same pass**, not copied forward. The previous header read `44731be`, which was **12 commits stale**
 because body edits never refreshed it; see the correction in §0.0 and the guard in §2.58.
+
+🔴 **WHY THIS LINE MOVED FROM `897850b` TO `4c1ab56`, AND WHY NOTHING ELSE IN THIS DOCUMENT MOVED
+WITH IT (2026-08-19 20:45 UTC).** `openitems_guard` refused this canon with **exactly one** mismatch
+— this HEAD line — while the other ten watched values reconciled against a runtime `import config`.
+The refusal was correct and it halted a Titan investigation mid-flight. But the staleness spanned
+**no Titan code at all**, and that is not an opinion, it is an empty diff:
+
+```
+$ git -C /root diff --stat 897850b..HEAD -- titan-bot/
+$ git -C /root diff --stat 897850b..HEAD -- titan-bot/ | wc -c
+0
+```
+
+All four intervening commits are infrastructure, none of them under `titan-bot/`:
+
+```
+$ git -C /root diff --name-only 897850b..HEAD
+.gitignore
+infra/authorized_commit.sh          infra/claude_task_dedup_hook.py
+infra/claude_session_cost_notice.py infra/orphan_shell_reaper.py
+infra/token_accounting.py
+```
+
+`4c1ab56` authorised commit-gate passage by file · `0dea45a` subscription-burn ledger ·
+`4f59749` UserPromptSubmit dedup hook · `4645382` orphan Bash-shell reaper.
+
+**So: the commit pointer was stale, the described trading state was not.** Do not read this refresh
+as "the canon was re-derived at `4c1ab56`" — the body below still dates from the `897850b` pass and
+every §-level claim carries its own date. What is warranted is narrower and exact: between the two
+commits Titan's code did not move, therefore the body's assertions about Titan were not invalidated
+by the drift. A header refreshed without saying this is the next reader's trap, which is why this
+paragraph exists instead of a silent seven-character edit.
+
+⚠️ **AND THE GUARD IS NARROWER THAN ITS OWN BANNER.** It prints `watched values : 11`, but it checks
+only those with a row inside the RUNTIME-STATE fence (`if not rows: continue`). Three of the eleven
+have **no row and are therefore silently unchecked**: `CONFLUENCE_SCORE_THRESHOLD`,
+`CONFLUENCE_FLAT_THRESHOLD`, and — note this — **`EMA_ENVELOPE_GATE_ENABLED`**, the flag whose
+behaviour the 2026-08-19 breakout investigation was opened to judge. "Watched" in the banner means
+*enumerated*, not *compared*. See §2.58b.
 
 ## ✅ §0.1 — G1: THE TRAIL'S "0.75R" IS A **LABEL DEFECT ONLY**. THE CALIBRATION STANDS (answered 2026-08-06 01:40)
 
@@ -3352,6 +3391,41 @@ publisher refuses to emit a snapshot whose header disagrees with runtime.** The 
 refusal *possible* and cheap — one call — but until `report_publish` (or whatever emits the dated path)
 invokes it and honours a non-zero exit, this is a discipline, not a mechanism. **Discipline is what
 failed on 2026-08-04 while the body was being written fifteen times.**
+
+---
+
+### 2.58b ⚠️ THE GUARD IS NARROWER THAN ITS OWN BANNER — "WATCHED" MEANS *ENUMERATED*, NOT *COMPARED* (2026-08-19 20:45)
+
+The guard prints `watched values : 11` and that number is the length of the `WATCHED` tuple, **not the
+number of values it actually compared.** The table loop is:
+
+```python
+rows = re.findall(rf'^\|[^|\n]*`{re.escape(name)}`[^|\n]*\|([^|\n]*)\|', doc, re.M)
+if not rows:
+    continue          # ← no row in the fence ⇒ SILENTLY UNCHECKED
+```
+
+`continue` is correct in isolation — a name absent from the fence has nothing to compare against, and
+raising there would make the guard noisy, which §2.58 explicitly designed against. The defect is that
+the **banner reports the ambition and never the coverage**, so a reader is told eleven things were
+checked when eight were. Measured 2026-08-19, three of the eleven have no fence row:
+
+| watched value | row in fence? | actually compared? |
+|---|---|---|
+| `CONFLUENCE_SCORE_THRESHOLD` | ❌ none | **no** |
+| `CONFLUENCE_FLAT_THRESHOLD` | ❌ none | **no** |
+| 🔴 `EMA_ENVELOPE_GATE_ENABLED` | ❌ none | **no** |
+| the other eight | ✅ | yes |
+
+🔴 **Note which one that is.** `EMA_ENVELOPE_GATE_ENABLED` is the flag the 2026-08-19 breakout
+investigation was opened to judge, and the guard that blessed this canon never looked at it. The two
+CONFLUENCE thresholds are asserted **in the header prose** ("`CONFLUENCE_SCORE_THRESHOLD = 3.0`,
+`CONFLUENCE_FLAT_THRESHOLD = 5.0`") where the guard cannot see them — an assertion outside the fence
+is exactly the invisible-and-authoritative shape §2.58 was built to kill, reproduced one level up.
+
+**This is a map entry, not a proposal.** Nothing here is fixed and no change is proposed; the closing
+move would be a coverage line (`compared N of M`) so the gap is visible in the output rather than
+discoverable only by reading the regex.
 
 ---
 
