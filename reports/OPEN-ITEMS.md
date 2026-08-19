@@ -3429,6 +3429,57 @@ discoverable only by reading the regex.
 
 ---
 
+### 2.58c 🔴 THE EMA ENVELOPE GATE HAD **TWO** REVIEW MECHANISMS AND NEITHER COULD SEE STARVATION (2026-08-19 22:30)
+
+**Recorded at the operator's instruction, as their own error, beside the three instrument blindnesses
+found on 2026-08-19.** The gate itself is **VINDICATED on outcomes** — see the measurement below — but
+the way it was set up to be reviewed was not, and that is the part that generalises.
+
+**Mechanism 1 — the pre-registered review point, §2.45c's table:**
+
+> | **review point** | **20 executed entries PER SIDE**, not calendar time, counted from 14:41 UTC |
+
+🔴 **The gate made its own review point unreachable.** The same table predicted entries would fall
+`0.90 → 0.47/day`. Measured 15 days later, the true post-gate rate is **0.13/day** — 3.6× worse than
+the forecast, and **1 LONG + 1 SHORT executed in total**. At that rate 20 entries *per side* arrives in
+**~300 days (0.8 years)**. A review counted in entries, applied to a mechanism that removes entries, is
+self-suspending: the harder it bites, the further away its own audit moves. **Counting in the units the
+change suppresses is the defect; calendar time would have fired weeks ago.**
+
+**Mechanism 2 — the drift watcher.** It did fire, at n=111, and reported the gate refuses CORRECTLY
+(mean 4 h drift −0.2177 %, four of four days negative). That reading was not wrong — it answered a
+different question. **Drift measures whether a refused signal would have MOVED favourably. It cannot
+measure what the signal would have EARNED**, because earning is decided by the stop and the trail, and
+§0's own rule says drift and realised R separate exactly there. Measured 2026-08-19 on the 701 refusals
+in the 15-day window: mean max-favourable excursion **+0.644 %** — by that reading the refused signals
+were "right" — while the same signals replayed as trades under the full contract realise
+**−12.03R**. Both facts are true; only the second is the one a trading decision needs.
+
+**So: one mechanism counted in a unit the gate suppressed, the other measured a proxy the contract
+overrides. Two reviews, neither able to see entry starvation.** Same class as
+`openitems_guard` (8 of 11), `silence_digest.py` (`side IN ('buy','sell')` hides 100 % of tier events)
+and `titan_regime_flat_high_adx_watch.sh` (a column NULL on 96 % of the rows it queries): **the
+instrument reports silence and the reader hears health.**
+
+⚠️ **AND THE OUTCOME MEASUREMENT EXONERATES THE GATE, WHICH IS WHY THIS ENTRY IS ABOUT THE REVIEWS AND
+NOT THE GATE.** Replayed on the harness that reproduces **2798 of 2798** stored fates exactly, with the
+gate disabled and nothing else changed: 345 signals uniquely admitted, **25 positions** under
+`MAX_POSITIONS_PER_SIDE=1`, real taker both sides —
+
+| cell | n | ΣR | mean | win |
+|---|---|---|---|---|
+| **ALL** | 25 | **−12.03R** | −0.481R | 36.0 % |
+| LONG | 13 | −1.96R | −0.151R | 53.8 % |
+| SHORT | 12 | **−10.07R** | −0.839R | 16.7 % |
+
+Both cells clear n≥8 and both are negative, so the pre-registered rule ("gate-off net negative on both
+sides → the gate stays") resolves on measurement rather than argument. The two trades the gate DID
+allow made **+0.73R combined**, and both would have been **crowded out** by earlier losing gate-off
+positions under the 1-per-side cap. **The gate is earning its starvation.** Full pass:
+`reports/2026-08-19-2230-titan-ema-envelope-gate-measured-on-outcomes.md`.
+
+---
+
 ### 2.57 ✅ 2026-08-05 — SIX COMMITS THE CANON WAS MISSING, IN ORDER
 
 Full detail in the dated reports; this is the canonical index so a session with no memory is not
