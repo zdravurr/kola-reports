@@ -10,7 +10,21 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `4c1ab56`, re-verified by `git rev-parse` at 2026-08-19 20:45 UTC** — and every value in
+🔴 **HEAD `a7e7b46`, re-verified by `git rev-parse` at 2026-08-21 19:50 UTC.**
+🔴 **THIS TIME THE DRIFT IS TITAN CODE AND IT CHANGES TRADING BEHAVIOUR — unlike the
+`897850b`→`4c1ab56` refresh below, which spanned no `titan-bot/` diff at all.** `a7e7b46`
+applies THREE of Mercury-SOL's cascade settings to Titan, live, by operator decision and
+explicitly OVER the replay's prediction that it makes the book worse:
+`HTF_NEUTRAL_REQUIRE_15M_DRYRUN` False→**True** · `CONFLUENCE_FLAT_THRESHOLD` 5.0→**3.0**
+(effect neutralised, constant kept — five sites import it by name) · **Lever B re-arm**
+ported from SOL (`HTF_REARM_FROM_15M_ENABLED=True`, cooldown 60, DRYRUN False).
+`CONFLUENCE_SCORE_THRESHOLD` stays **3.0** — SOL's 2.0 is a fourth change and was NOT applied.
+Size unchanged: `LIVE_FIXED_MARGIN_USDT` 30.0 × 5 = $150.
+**Stopping rule: 20 closed positions OR 30 days; revert all three if the live book is worse
+than the recorded baseline (57 positions, ΣR −0.2702, win 42.1%).**
+Full record: `reports/2026-08-22-1100-titan-sol-port-applied-live.md`.
+
+*(previous header, kept for the audit trail: HEAD `4c1ab56`, re-verified 2026-08-19 20:45 UTC)* — and every value in
 this header and in the current-state table below was re-read by **importing `config` at runtime in the
 same pass**, not copied forward. The previous header read `44731be`, which was **12 commits stale**
 because body edits never refreshed it; see the correction in §0.0 and the guard in §2.58.
@@ -4453,6 +4467,10 @@ disagreement with runtime. Cite an OLD value anywhere outside the fence; inside 
 | `EXIT_ADVISOR_HOURLY` | True |
 | `WALL_TRAIL_LIVE_ENABLED` | False |
 | `MAX_POSITIONS_PER_SIDE` | 1 |
+| 🔴 `CONFLUENCE_SCORE_THRESHOLD` | **3.0** — UNCHANGED by the 2026-08-21 SOL port. SOL runs 2.0; porting it is a FOURTH change and was deliberately refused |
+| 🔴 `CONFLUENCE_FLAT_THRESHOLD` | **3.0** since `a7e7b46` 2026-08-21 (was 5.0). Set EQUAL to the TREND bar so an empty 1H tier no longer raises it — SOL has no such constant at all. Deleting it is a NameError: `main.py:505` imports it by name and five sites read it |
+| `HTF_NEUTRAL_REQUIRE_15M_DRYRUN` | **True** since `a7e7b46` 2026-08-21 (was False). The rule LOGS and no longer judges — SOL parity. It was Titan's largest refusal cause: 1,514 of 4,086 in 30 days |
+| `HTF_REARM_FROM_15M_ENABLED` / `HTF_REARM_COOLDOWN_MINUTES` / `HTF_REARM_DRYRUN` | **True / 60 / False** — NEW in `a7e7b46`, ported from Mercury-SOL Lever B. Before this the word `rearm` appeared zero times in Titan's tree |
 | `POST_ENTRY_RECHECK_ENABLED` / `RECHECK_TIERS_SEC` | True / `[10, 60, 300]` |
 | 🔴 `SL_ATR_MULT` / `TRAIL_MULT_ATR` | **2.25 / 1.6875 (= 0.75R)** — changed `be53e63` 2026-08-04 17:01:29; this row read `2.5 / 2.5` until 2026-08-05 22:00, which would have made any reader compute 1R **wrong** |
 | 🔴 `AI_ADVISOR_HIDE_1H` / `HTF_TOLERATE_NEUTRAL` | **False** / True — HIDE_1H set False in `de1d0f2` 2026-08-05: it never hid anything (the direction is inside the LuxAlgo signal NAME on 100% of withheld lines) |
