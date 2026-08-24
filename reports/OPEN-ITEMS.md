@@ -10,7 +10,48 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `a7e7b46`, re-verified by `git rev-parse` at 2026-08-21 19:50 UTC.**
+🔴 **HEAD `4a1786c`, re-verified at 2026-08-24 13:15 UTC — and re-verified against a NEW
+DEFINITION: `git log -1 --format=%h -- titan-bot/`, the last commit that TOUCHED TITAN, NOT
+`git rev-parse HEAD` of the whole `/root` repo.** `4a1786c` is audit tooling only
+(`tools/openitems_guard.py`); **the last commit that changed Titan's TRADING BEHAVIOUR is still
+`a7e7b46`**, the SOL-PORT described below, and the live experiment on it is unaffected.
+
+🔴 **WHY THE GUARD'S SUBJECT WAS NARROWED ON 2026-08-24, AND WHY THAT IS NOT A WEAKENING.**
+`openitems_guard` compared this header against the HEAD of **all of `/root`**, while this header
+describes **Titan**. So any commit anywhere in the repo — metrics, dirigent, infra — made this
+canon "stale" and made the guard REFUSE on a matter it had no bearing on. That is not a
+hypothetical: it fired three times that way, and **every one of the three spanned ZERO bytes of
+`titan-bot/`**:
+
+| fired | header claimed | repo HEAD was | `git diff .. -- titan-bot/` | what the span actually was |
+|---|---|---|---|---|
+| 2026-08-19 20:45 | `897850b` | `4c1ab56` | **0 bytes** | non-Titan; **halted a Titan investigation mid-flight** |
+| 2026-08-21 19:50 | `4c1ab56` | `a7e7b46` | (real Titan change — correct fire) | SOL-PORT applied live |
+| 2026-08-24 12:58 | `a7e7b46` | `8de7ef4` | **0 bytes** | 3 commits, all `infra/` session-cost metrics; **halted the SOL position-cap investigation** |
+
+Two of the three refusals carried **no trading meaning whatsoever** and each cost a live
+investigation. A guard whose sensitivity is wider than its subject is a guard that gets silenced,
+and a silenced guard is worse than none. The subject is now the document's actual subject.
+
+**IT STILL CATCHES REAL DRIFT — proven by execution, four ways, not asserted:**
+1. On the identical tree and identical canon, the OLD guard exited **1** and the NEW guard exited
+   **0** — with no edit to this document. The `8de7ef4` firing was pure noise, and under the new
+   definition the header's `a7e7b46` was **already correct**.
+2. In an isolated repo, after two non-Titan commits the subject stayed pinned to the Titan commit.
+3. In that same repo a commit changing `titan-bot/config.py` (`SL_ATR_MULT` 2.25→9.99) moved the
+   subject and `check()` returned **1**.
+4. Unforced and real: committing the guard fix itself (`4a1786c`, inside `titan-bot/`) moved the
+   subject and the guard refused this document until this header was refreshed — which is the
+   refusal you are reading the fix for.
+
+🔴 **KNOWN RESIDUAL, stated so it is not a trap:** the guard lives at
+`titan-bot/tools/openitems_guard.py`, i.e. **inside its own subject**, so editing the guard moves
+the value the guard checks. Proof 4 is exactly that happening. It is rare and it is visible (a
+one-line header refresh), unlike the metrics commits which fired three times in three days — but a
+future reader seeing this header point at a tooling commit should not conclude Titan's code moved.
+Full record: `reports/2026-08-24-1315-guard-subject-narrowed-and-sol-position-cap.md`.
+
+*(previous header line, kept for the audit trail: HEAD `a7e7b46`, re-verified by `git rev-parse` at 2026-08-21 19:50 UTC)*
 🔴 **THIS TIME THE DRIFT IS TITAN CODE AND IT CHANGES TRADING BEHAVIOUR — unlike the
 `897850b`→`4c1ab56` refresh below, which spanned no `titan-bot/` diff at all.** `a7e7b46`
 applies THREE of Mercury-SOL's cascade settings to Titan, live, by operator decision and
