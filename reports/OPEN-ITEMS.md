@@ -10,11 +10,17 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `4a1786c`, re-verified at 2026-08-24 13:15 UTC — and re-verified against a NEW
-DEFINITION: `git log -1 --format=%h -- titan-bot/`, the last commit that TOUCHED TITAN, NOT
-`git rev-parse HEAD` of the whole `/root` repo.** `4a1786c` is audit tooling only
-(`tools/openitems_guard.py`); **the last commit that changed Titan's TRADING BEHAVIOUR is still
-`a7e7b46`**, the SOL-PORT described below, and the live experiment on it is unaffected.
+🔴 **HEAD `3888504`, re-verified at 2026-08-27 17:20 UTC by `git log -1 --format=%h -- titan-bot/`,
+the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
+
+🔴🔴 **`3888504` IS A TRADING-BEHAVIOUR CHANGE AND IT OPENS A COHORT BOUNDARY. READ §0.LONGPARTIAL
+BELOW BEFORE POOLING ANY LONG OUTCOME ACROSS 2026-08-27 17:14 UTC.** `LONG_PARTIAL_ENABLED`
+True→**False** — one line, applied live from a flat position. The previous behaviour-changing
+commit was `a7e7b46` (SOL-PORT, 2026-08-21), whose live experiment continues; its SHORT half is
+unaffected by this change and stays clean.
+
+*(previous header line, kept for the audit trail: HEAD `4a1786c`, re-verified 2026-08-24 13:15 UTC —
+audit tooling only (`tools/openitems_guard.py`), no trading-behaviour diff.)*
 
 🔴 **WHY THE GUARD'S SUBJECT WAS NARROWED ON 2026-08-24, AND WHY THAT IS NOT A WEAKENING.**
 `openitems_guard` compared this header against the HEAD of **all of `/root`**, while this header
@@ -621,6 +627,104 @@ Rollback is `LIVE_TRADING_ENABLED = False` + `ORDER_ADAPTER_LIVE = False` in `co
 ---
 
 ## 0. HOW TO READ THE DATA WITHOUT FOOLING YOURSELF
+
+### 🔴🔴 §0.LONGPARTIAL — THE LONG-EXIT-CONTRACT BOUNDARY — **2026-08-27 17:14:07 UTC**
+
+**LONG OUTCOMES BEFORE AND AFTER THIS INSTANT ARE NOT ONE SAMPLE. Do not pool them, do not
+average across them, do not extend any LONG-side count through this line.**
+
+`LONG_PARTIAL_ENABLED` **True → False** at commit `3888504`, applied live from a flat position
+(0 open rows, both BingX probes FLAT and agreeing, 0 open orders, restart 17:14:07, boot
+`RECONCILE-XDB ✅ 0 exchange position(s), 0 open row(s)`).
+
+**WHAT CHANGED, EXACTLY:** a winning LONG that reaches **+1R** no longer surrenders **1/3** of
+its size at that level. The whole position now trails. Nothing else moved: `LONG_PARTIAL_LEVEL_R`
+(1.0) and `LONG_PARTIAL_FRACTION` (1/3) are unchanged and simply inert while the switch is False,
+so flipping it back to **True** restores the previous contract exactly, with no other edit.
+
+**WHY:** replayed on Titan's own book — the seventeen longs of 2026-08-19, `bardir` intrabar
+order, 1m candles, trail 1.6875/2.25 = 0.75×1R, taker 0.0005 both legs, stand calibrated to the
+published 2026-08-22 run within 0.6%:
+
+| configuration | ΣR (n=17) | mean | vs today |
+|---|---|---|---|
+| arm 1.00R, partial **ON** (old) | +102.54 | +6.032 | — |
+| arm 1.00R, partial **OFF** (now) | **+145.94** | **+8.585** | 🔴 **+43.40R** |
+
+Under the real `MAX_POSITIONS_PER_SIDE = 1`, which is what Titan would actually have taken:
+**+7.34R → +10.09R, +2.75R on two positions.** On Mercury-SOL the same partial was removed
+2026-08-14 and it was the **only monotone axis** in that entire sweep.
+
+🔴 **WHAT WAS *NOT* PORTED WITH IT — AND MUST NOT BE ADDED CASUALLY LATER.** SOL's **0.75R arm**.
+`TRAIL_ARM_R` **does not exist in Titan** and the +1R arm stays hardcoded in **both** sites
+(`virtual_trader._breakeven_reached` and `breakeven_worker`'s target). It was measured and
+**refuted**: **−15.11R** on the seventeen against an **upper-bound** benefit of **+2.78R** across
+the whole 63-position book. The mechanism is precisely the operator's standing complaint — an
+early arm starts the trail from a **lower water mark** and cuts runners short. Partial-off and
+arm-0.75R are separable; only one survived.
+
+#### 🔴 THE SHORT SIDE IS UNAFFECTED — AND THAT IS THE HALF THAT STAYS CLEAN
+
+The switch is LONG-only and always was. Measured on 2026-08-19's three shorts, all four
+configurations give the identical **−3.44R** (their MFE were +0.06/+0.06/+0.04R — they never
+reached any arm level). Therefore, of the frozen 65-position book:
+
+* **34 of 65 closed positions are SHORT — untouched by this change.** The 2026-08-21 cascade
+  experiment's SHORT half remains a **clean, uninterrupted sample**.
+* **31 of 65 are LONG — that half is now MIXED.** The cascade experiment's LONG arm spans two
+  different exit contracts and its LONG-side conclusion cannot be read as one sample.
+
+#### 🔴 THE FROZEN BASELINE — recorded so the comparison cannot be reconstructed later
+
+State at the boundary (66 closed rows; `id=33` excluded, no `initial_risk_usdt`; 6 further rows
+sit in `archived_pre_geometry_fix` and are not in the book):
+
+| cut | n | ΣR | mean R | median R | win rate | median hold |
+|---|---|---|---|---|---|---|
+| **ALL** | **65** | **−4.711** | −0.0725 | −0.2795 | **25/65 = 38.46 %** | 5.92 h |
+| **LONG** (now mixed) | **31** | **−9.217** | −0.2973 | −0.3065 | **9/31 = 29.03 %** | 5.22 h |
+| **SHORT** (stays clean) | **34** | **+4.506** | +0.1325 | −0.0864 | **16/34 = 47.06 %** | 6.95 h |
+
+LONG only, by what closed it — the cut the change acts on:
+
+| closed by | n | ΣR | mean R | win rate | median hold |
+|---|---|---|---|---|---|
+| `sl` | 16 | −9.747 | −0.6092 | 1/16 | 3.03 h |
+| `trail` | 4 | **+2.574** | +0.6435 | 4/4 | 7.19 h |
+| `ai_exit` | 5 | −2.770 | −0.5539 | 0/5 | 4.01 h |
+| `external` | 6 | +0.726 | +0.1210 | 4/6 | 14.96 h |
+
+SHORT only, frozen for the clean comparison: `sl` 12 / −10.008 · `trail` 11 / **+14.581** ·
+`ai_exit` 5 / +0.165 · `external` 5 / −0.248 · `post_entry_critical` 1 / +0.015.
+
+#### 🔴 PRE-REGISTERED: WHAT SHOULD CHANGE — AND HOW RARELY IT WILL
+
+**The prediction:** a LONG that reaches +1R should now carry its **full** size to the trail
+instead of surrendering a third at the arm. Concretely, `realized_partial_usdt` stops being
+written, `partial_taken` stays 0/NULL on every new LONG, and a LONG winner's realised R should
+move **closer to its MFE** than the old blended figure did.
+
+🔴 **AND THE HONEST SIZE OF THE EFFECT, STATED NOW SO IT IS NOT "DISCOVERED" IN A MONTH:
+THE PARTIAL HAS FIRED EXACTLY TWICE IN THE ENTIRE HISTORY OF THIS BOT.**
+
+| vpos | side | closed | MFE | realised R | closed by | partial realised |
+|---|---|---|---|---|---|---|
+| **82** | LONG | 2026-07-27 | +2.242R | +1.039 | trail | $18.91 |
+| **94** | LONG | 2026-08-17 | +1.802R | +0.865 | trail | $0.24 |
+
+Denominators, all three of them:
+
+* **2 of 31** LONGs in the whole closed book.
+* **2 of 10** LONGs closed since the partial went live on 2026-07-26 — **20 %**.
+* **2 of 2** LONGs that actually reached +1R in that window — i.e. **the mechanism fired every
+  time it was eligible; it was simply eligible twice.**
+
+> 🔴 **THEREFORE: THIS CHANGE IS CORRECT BUT NEARLY INERT IN THE SHORT RUN.** At the observed
+> rate it touches roughly **one LONG per two weeks**. Anyone reading Titan's book a month from
+> now must NOT attribute a swing in ΣR to this switch without first checking how many LONGs
+> reached +1R in the interval — if that count is 0 or 1, this change explains **nothing**, and
+> the movement came from somewhere else. Expect the evidence to accumulate over **months**, and
+> do not re-tune on fewer than the ~30 clean longs the original comment already asked for.
 
 ### 🔴🔴 THE 1R BOUNDARY — **2026-08-04 17:01:29 UTC**. R-MULTIPLES DO NOT POOL ACROSS IT.
 
@@ -4515,6 +4619,8 @@ disagreement with runtime. Cite an OLD value anywhere outside the fence; inside 
 | `POST_ENTRY_RECHECK_ENABLED` / `RECHECK_TIERS_SEC` | True / `[10, 60, 300]` |
 | 🔴 `SL_ATR_MULT` / `TRAIL_MULT_ATR` | **2.25 / 1.6875 (= 0.75R)** — changed `be53e63` 2026-08-04 17:01:29; this row read `2.5 / 2.5` until 2026-08-05 22:00, which would have made any reader compute 1R **wrong** |
 | 🔴 `AI_ADVISOR_HIDE_1H` / `HTF_TOLERATE_NEUTRAL` | **False** / True — HIDE_1H set False in `de1d0f2` 2026-08-05: it never hid anything (the direction is inside the LuxAlgo signal NAME on 100% of withheld lines) |
+| 🔴 `LONG_PARTIAL_ENABLED` | **False** since `3888504` 2026-08-27 17:14 UTC (was True since 2026-07-26). LONG-only 1/3-at-+1R partial is OFF. Measured +43.40R on the seventeen longs of 2026-08-19 (+2.75R under the 1-position cap). 🔴 COHORT BOUNDARY — see §0.LONGPARTIAL. `LONG_PARTIAL_LEVEL_R` 1.0 and `LONG_PARTIAL_FRACTION` 1/3 are UNCHANGED and inert while this is False; setting this back to True restores the old behaviour exactly |
+| 🔴 `TRAIL_ARM_R` | **ABSENT — and deliberately so.** SOL's 0.75R arm was NOT ported with the partial. The +1R arm stays hardcoded in BOTH sites (`virtual_trader._breakeven_reached`, `breakeven_worker` target). Refuted at −15.11R against an upper-bound benefit of +2.78R: an early arm starts the trail from a LOWER water mark and cuts runners short |
 | ⚠️ `EQH_EQL_SMART_TP_ENABLED` | **False** since `de1d0f2` 2026-08-05 — still unreachable (§2.6); the flag no longer *reads* armed. Revival REFUSED: §2.6 measured the smart-TP at **−971 simulated** |
 <!-- RUNTIME-STATE:END -->
 
