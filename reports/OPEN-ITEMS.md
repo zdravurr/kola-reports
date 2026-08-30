@@ -14,12 +14,21 @@ import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
 *(previous header values `3888504`, `a0c77f2`, `2bea657`, kept for audit.)*
 
-## 🔴🔴 §0.EXITFACTS — `295af4e` IS ON DISK AND **NOT LOADED**. 2026-08-30 22:10 UTC
+## ✅ §0.EXITFACTS — `295af4e` **LOADED LIVE 2026-08-30 16:04:11 UTC**
 
-**DEPLOYMENT GAP, DELIBERATE.** `295af4e` is committed and pushed but `titan.service` has **NOT**
-been restarted: **vpos 100 (LONG, opened 2026-08-30 13:05:16) is open** and the operator decides
-when Titan restarts under a live position. **Until then the worker runs `2bea657` and the exit
-advisor still sees the OLD prompt.**
+**The deployment gap recorded here is CLOSED.** Restarted by operator decision under the open
+vpos 100; the position came through untouched (**0 of its fields changed**; venue `STOP_MARKET`
+`orderId` 2094048810753437696, `updateTime` 1788095116686 and `stopPrice` 78204.5 all **unchanged**
+— the restart did not write to the protective stop). Boot: `RECONCILE-XDB ✅ exchange and DB agree:
+1 exchange position(s), 1 open row(s)`, `LONG open, SL present @ 78204.5 — kept`, no traceback.
+
+🔴 **THE FIRST REAL CONSULTATION FIRED 92 SECONDS LATER, 16:05:43, AND THE ADVISOR CITED THE FEE:**
+verdict **HOLD** (conf 0.72), reason ending *"…Fee cost (0.161R) i[s]…"*. All four blocks present in
+the stored prompt. The trend block — which had silently died once — rendered
+`Unrealised: -0.06R -> +0.54R (+0.60R)` from real data.
+
+**`_CLOSE_SYSTEM_RICH` read out of the LOADED bytecode is byte-identical and contains no
+threshold word** (`threshold`/`prefer`/`lean`/`should`/`only if`/`below`/`above`: none).
 
 **WHAT IT CHANGES: the exit prompt gains FOUR FACTS. It gains NO threshold.**
 🔴 **`_CLOSE_SYSTEM_RICH` IS BYTE-FOR-BYTE UNCHANGED** and still contains no criterion — the
