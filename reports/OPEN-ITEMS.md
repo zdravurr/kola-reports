@@ -10,9 +10,38 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `295af4e`, re-verified at 2026-08-30 22:10 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `7ba8241`, re-verified at 2026-08-30 23:58 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `3888504`, `a0c77f2`, `2bea657`, kept for audit.)*
+*(previous header values `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+## 🔴 §0.REASONCAP — `7ba8241` IS ON DISK AND **NOT LOADED**. 2026-08-30 23:58 UTC
+
+**DEPLOYMENT GAP, DELIBERATE — vpos 100 is open and the operator decides the restart.
+Until then exit reasons are STILL being cut at 400 characters.**
+
+**The cap was not an occasional nuisance — it was truncating almost everything.** Measured over
+**157** stored exit consultations: **median `ai_reason` length = 400, and 151 of 157 (96 %) sat at
+the cap.** Every exit rationale this bot has produced has been losing its tail, including the ten
+the 2026-08-30 advisor analysis was built on.
+
+Raised **400 → 1200 in all three places it was imposed** — raising one alone would have changed
+nothing, because the PROMPT also asked for 400:
+
+| place | what it is |
+|---|---|
+| `claude_advisor.py` `_CLOSE_SYSTEM_RICH` | the **instruction** — `max 400 chars` → `max 1200 chars` |
+| `main.py:1706` `_ai_fields_from_advice` | the **stored value** — every exit consultation writes through here |
+| `main.py:3446` `_handle_5m_close_via_ai` | the HTTP echo on the dryrun branch |
+
+**There is no cap in the schema** (`('ai_reason','TEXT')`; SQLite TEXT is unbounded).
+1200 is ~3× the observed ceiling; at ~1 consultation/hour that is ~29 KB a month against a 95 MB DB.
+
+🔴 **`_CLOSE_SYSTEM_RICH` still contains NO criterion. The entire diff inside it is one number:**
+
+```diff
+- "close (true|false), confidence (float 0.0-1.0), reason (string, max 400 chars)."
++ "close (true|false), confidence (float 0.0-1.0), reason (string, max 1200 chars)."
+```
 
 ## ✅ §0.EXITFACTS — `295af4e` **LOADED LIVE 2026-08-30 16:04:11 UTC**
 
