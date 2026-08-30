@@ -10,8 +10,83 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `3888504`, re-verified at 2026-08-27 17:20 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `a0c77f2`, re-verified at 2026-08-30 19:40 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
+*(previous header value `3888504`, kept for audit — see §0.CARDLABEL immediately below.)*
+
+## 🔴🔴 §0.CARDLABEL — `a0c77f2` IS ON DISK AND **NOT LOADED**. 2026-08-30 19:40 UTC
+
+**THIS IS A DEPLOYMENT GAP AND IT IS DELIBERATE.** `a0c77f2` is committed to `titan-bot/` but
+`titan.service` has **NOT** been restarted, because **vpos 100 (LONG, opened 2026-08-30 13:05:16)
+is open** and the operator alone decides when Titan restarts under a live position.
+**Until that restart the running worker still executes `3888504` and still sends the OLD cards.**
+Anyone reading a Titan close card before the restart is reading the old rendering.
+
+**What `a0c77f2` changes — DISPLAY AND ONE STORED FIELD, NO TRADING RULE:**
+
+* `virtual_trader.py:1310` — `is_virtual=True` (hardcoded) → `is_virtual=(row['stop_order_id'] is None)`.
+* `virtual_trader.py:1282` — same predicate on the funding call, which switches a LIVE row from the
+  per-settlement ESTIMATE to the venue's real funding ledger. **This is the one stored number that
+  moves** (`funding_paid`, and therefore `net_pnl`). Measured before applying: the real branch
+  returns `-totalFunding` to **1e-6 on 6 real closes**, so the change is a label correction, not a
+  revaluation. The code's own standing warning — *"this path has never run against a real BingX
+  fill; the SIGN and MAGNITUDE MUST be sanity-checked on the first real close"* — is **DISCHARGED**.
+* `close_report.py` — headers become `🔴💵 REAL MONEY — Trade Closed` / `🧪 PAPER — SIMULATED, NO
+  ORDER SENT`, and the **notional** is rendered beside the size.
+
+**WHY:** every one of the **15 real closes** since 2026-07-29 reached the operator headed
+`🧪 Virtual Trade Result`. A paper stop-out prints **−$137.32 at $9,994 notional** beside a live one
+printing **−$2.54 at $146** — identical headers, 68× apart in size.
+
+🔴 **THE PREDICATE IS SOUND BY CONSTRUCTION, and this is the sentence to quote:** in live mode a
+row is written **only after** `place_stop()` returns an id; if the stop cannot be placed the entry
+is **aborted, the emergency close fires and NO ROW IS WRITTEN** (`virtual_trader.py`, STOP OWNERSHIP
+block). Therefore *"a live row whose stop placement failed"* **cannot exist**. Verified empirically:
+**0** rows opened after go-live with `stop_order_id IS NULL`, **0** rows opened before it with a
+non-NULL one. Titan has **no `is_paper` column**; `stop_order_id` is the only live marker.
+
+⚠️ **STILL UNFIXED, DELIBERATELY:** the cumulative batch line (`main.py:429-441`) still pools paper
+with live. Batch #2 (2026-07-04 → 08-07) straddles the go-live and showed **−$833.09**, mixing
+$10,000 paper trades with $150 live ones. Two options were put to the operator and **neither is
+applied**; this is a decision, not a patch.
+
+## 🔴🔴 §0.FIRSTLIVE — THE FIRST LIVE TRADE IS **NOT IN THE DATABASE**. 2026-07-29 20:05:13 UTC
+
+**ANY LIVE-TRADING COUNT COMPUTED FROM `virtual_positions` IS SHORT BY ONE TRADE AND $0.2645.**
+Quote that sentence before quoting any live P&L derived from the DB — including every figure in
+the 2026-08-30 15:00 and 17:20 reports.
+
+```
+positionId 2082558078264504322   SHORT BTC-USDT
+opened  2026-07-29 20:05:13 UTC     closed 2026-07-29 21:29:21 UTC
+size    0.0046 BTC = $292.14 notional   <- 🔴 2.0x the configured $150
+netProfit -0.2645 USDT     (realised +0.0276, commission -0.2921, funding 0)
+```
+
+**Its ledger, verbatim — two OPENING fees one second apart:**
+
+```
+20:05:13  TRADING_FEE   Position opening fee   -0.07303
+20:05:14  TRADING_FEE   Position opening fee   -0.07304   <- SECOND ORDER, +1s
+21:29:21  REALIZED_PNL  Close Short            +0.02760
+21:29:21  TRADING_FEE   Position closing fee   -0.14605   <- DOUBLE, it closed DOUBLE size
+```
+
+**Two orders of $150 went out one second apart at the instant live trading was enabled, giving
+$292 of notional instead of $150, and NEITHER was written to `virtual_positions`.**
+
+🔴 **THE COST, STATED EXACTLY — the brief's "$0.29" is the TOTAL commission, not the excess.**
+Total commission on this trade: **$0.29212** (0.07303 + 0.07304 opening, 0.14605 closing).
+A single correctly-sized $150 order would have paid ≈ **$0.1460**.
+**Excess caused by the duplication: ≈ $0.1461.** Whole-trade net: **−$0.2645**.
+
+**Why nothing caught it:** `RECONCILE-XDB` compares only **OPEN** positions, and this one closed
+8 hours before the next restart. Reconciliation proof: DB's 14 live rows sum **−9.2228**;
+`−9.2228 + (−0.2645) = −9.4873` against the venue's **−9.4875** over 15 positions.
+
+⚠️ **RECORDED, NOT INVESTIGATED** (operator instruction, 2026-08-30). This resembles the
+"two `closePosition` stops on one position" class that §1a declares shut — but **this trade
+predates those doors by hours**, and the missing row was never noticed by anything.
 
 🔴🔴 **`3888504` IS A TRADING-BEHAVIOUR CHANGE AND IT OPENS A COHORT BOUNDARY. READ §0.LONGPARTIAL
 BELOW BEFORE POOLING ANY LONG OUTCOME ACROSS 2026-08-27 17:14 UTC.** `LONG_PARTIAL_ENABLED`
