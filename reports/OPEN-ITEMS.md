@@ -14,6 +14,49 @@ import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
 *(previous header values `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
 
+## 🔴🔴 §0.CASCADE-STOP — NEW STOPPING RULE, OPERATOR DECISION 2026-08-30. **SUPERSEDES THE 2026-08-21 RULE.**
+
+🔴 **REVERT the cascade port (`a7e7b46`) when `ΣR ≤ −5.0R` OR at **10 closed positions**, whichever
+comes first.** State at adoption: **5 closes, ΣR −2.666.** Maximum further exposure ≈ **−$4.2**.
+
+**THIS REPLACES "20 closes or 2026-09-20, revert if worse than baseline".**
+
+**WHY THE ORIGINAL RULE COULD NOT CONCLUDE:** it judged **per side**, and after **nine days the
+SHORT leg has accrued ZERO closes**. The 2026-09-20 deadline would have arrived with one half of
+the experiment empty and nothing to compare. Sitting to 20 closes costs **≈ −$19.14** at the
+observed rate — **twice everything Titan has lost in a month** (−$9.49) — for that same verdict.
+
+**THE LONG LEG IS CONTAMINATED.** `LONG_PARTIAL_ENABLED` went False at `3888504` on **2026-08-27
+17:14**, inside the window. Of the five closes, **vpos 99 (opened 2026-08-30 06:55) is post-partial-off**;
+95, 96, 97, 98 are clean. **Clean cascade evidence is therefore FOUR closes, ΣR −2.135, all LONG.**
+
+| | n | ΣR | per trade | win |
+|---|---|---|---|---|
+| baseline (pre-registered) | 57 | −0.2702 | **−0.0047R** | 42.1 % |
+| experiment to date | 5 | **−2.6664** | **−0.5333R** | **0.0 %** |
+
+**Running ~112× worse per trade than the baseline it must beat.**
+
+### 🔴 THE HONEST CONTEXT — WRITE IT DOWN OR IT WILL BE FORGOTTEN
+
+**The replay PREDICTED this configuration would be worse: −13.01R against −2.70R over 88 days.
+It was applied over that prediction, by operator decision.** Five closes at a 0 % win rate are
+**consistent with the replay having been right.**
+
+⚠️ **AND THE LIMIT OF THAT SENTENCE, STATED IN THE SAME BREATH: n=5 PROVES NOTHING.** Five straight
+losses at a 42 % base win rate carry a probability of roughly **6 %** — unusual, not impossible, and
+nowhere near any Bonferroni bar. **What is different here is that the PRIOR was against the change
+and the live result agrees with the prior.** That is weak evidence pointing the same way as a
+measurement made before the fact — it is not a measurement.
+
+**Report the trigger state after EVERY close from here.** Do not revert without the trigger.
+
+**THE REVERT IS THREE LINES + A RESTART FROM FLAT.** Snapshot verified present and readable
+2026-08-30: `config.py.bak_solport_20260821T193618Z` (61 129 bytes). Pre-port values it carries:
+`HTF_NEUTRAL_REQUIRE_15M_DRYRUN = False`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
+⚠️ `HTF_REARM_COOLDOWN_MINUTES` and `HTF_REARM_DRYRUN` **do not exist in that .bak** — they were
+ADDED by the port. Reverting means **removing** them, not restoring a prior value.
+
 ## 🔴 §0.REASONCAP — `7ba8241` IS ON DISK AND **NOT LOADED**. 2026-08-30 23:58 UTC
 
 **DEPLOYMENT GAP, DELIBERATE — vpos 100 is open and the operator decides the restart.
