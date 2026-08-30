@@ -10,9 +10,54 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `2bea657`, re-verified at 2026-08-30 20:30 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `295af4e`, re-verified at 2026-08-30 22:10 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `3888504` then `a0c77f2`, kept for audit — see §0.CARDLABEL below.)*
+*(previous header values `3888504`, `a0c77f2`, `2bea657`, kept for audit.)*
+
+## 🔴🔴 §0.EXITFACTS — `295af4e` IS ON DISK AND **NOT LOADED**. 2026-08-30 22:10 UTC
+
+**DEPLOYMENT GAP, DELIBERATE.** `295af4e` is committed and pushed but `titan.service` has **NOT**
+been restarted: **vpos 100 (LONG, opened 2026-08-30 13:05:16) is open** and the operator decides
+when Titan restarts under a live position. **Until then the worker runs `2bea657` and the exit
+advisor still sees the OLD prompt.**
+
+**WHAT IT CHANGES: the exit prompt gains FOUR FACTS. It gains NO threshold.**
+🔴 **`_CLOSE_SYSTEM_RICH` IS BYTE-FOR-BYTE UNCHANGED** and still contains no criterion — the
+standing line from 2026-08-05 (give the model the fact, let it weigh; no base rates, no lean) holds.
+
+| fact | why | measured basis |
+|---|---|---|
+| **(a) cost of closing**, in R, per consultation, from **this account's** taker rate | the advisor fires where `upnl_r < −0.20R` and the round trip is ~40 % of that stake — and the prompt never said the fee existed | §2b, §3d of 2026-08-30 20:30 |
+| **(b) the stop is already there** — an exchange-side `STOP_MARKET` that outlives the process, with the floor on holding stated in R | it had been reasoning as though closing were the only protection | §2b |
+| **(c) what an early close surrenders** — distance still to run to the +1R arm | 4 of the 9 unarmed live positions it closed **would have armed later** | §2c |
+| **(d) direction of travel** since the previous consultation, from `smart_exit_dryrun_samples` (already written hourly — **no new state**) | consulted hourly, closes at a 2.01h median: it sees a position 3–4 times and judged every frame alone | §2d |
+
+🔴 **(d) IS A FACT, NEVER A FILTER, AND THE CODE SAYS SO.** "MFE still rising" was true on **4/4**
+of the closes it got WRONG **and 4/6** of the ones it got RIGHT. It does not discriminate. Anyone
+tempted to promote it to a rule should read that sentence twice.
+
+### 🔴 PRE-REGISTERED, BEFORE THE RESTART — WRITE THE EXPECTATION DOWN OR IT IS NOT A TEST
+
+**Baseline: close rate = 13.2 % (5 of 38 consultations) in the current era** (since 2026-08-05 21:00,
+after the five prompt commits settled). Median hold 2.01h. `upnl_r` cliff at −0.20R.
+
+**EXPECTED after: a MODEST FALL, to roughly 8–13 %.** Facts (a) and (b) both argue against marginal
+closes and (c) against early ones; (d) cuts both ways. A shift of a few points is the honest expectation.
+
+🔴 **AND THE FALSIFIERS, STATED NOW:**
+
+* **Below ~5 %** — the facts did not inform the model, they **suppressed** it. That is a finding
+  about the change, not a success: a prompt that stops the advisor closing at all has replaced
+  one un-written rule with another.
+* **Above ~25 %** — the facts pushed it the other way, which nothing here predicts, and the
+  change must be re-read rather than kept.
+* **Either way**, the first ~30 consultations are the sample. **Do not read fewer.**
+  And note the arithmetic: at 13 % it takes **~230 consultations** to see 30 closes.
+  🔴 **This will take MONTHS. Do not re-tune on five.**
+
+⚠️ **Not yet proven end to end:** the prompt is verified by rendering it against the live vpos 100
+(all four blocks present, correct numbers) — but no consultation has run against it, because it
+is not loaded.
 
 ## ✅ §0.CARDLABEL — `a0c77f2` + `2bea657` **LOADED LIVE 2026-08-30 15:34:05 UTC**
 
@@ -68,6 +113,34 @@ What the split reveals on the existing book:
 | 3 | −$4.93 (n=6) | n=6 · −$4.93 | n=0 · +$0.00 |
 
 **The −$833.09 that has been on every card since 29.07 is −$4.30 of real money and −$828.80 of paper.**
+
+## 🔴🔴 §0.TOLL — FOUR LIVE TRADES THAT **COULD NOT WIN**. 2026-08-30
+
+**These four did not "lose". They could not win, because price never moved far enough to pay
+the toll.** Quote that sentence before scoring any of them as a bad entry.
+
+| vpos | lifetime MFE | round-trip toll | verdict |
+|---|---|---|---|
+| **88** | 0.076R | 0.082R | never covered the fee |
+| **92** | 0.001R | 0.082R | never covered the fee |
+| **93** | 0.000R | 0.136R | never moved at all; closed 10s after entry |
+| **99** | 0.060R | 0.143R | never covered the fee |
+
+**The toll is `fee/R = 2 × taker × price / (SL_ATR_MULT × ATR) = 0.001 / (k × atr_pct)`.**
+🔴 **POSITION SIZE CANCELS OUT.** Verified algebraically and on 14/14 live rows to 1e-3. It is set
+by **stop width and volatility only**, and ran **0.050R … 0.159R (3.2×)** across the live book
+purely because ATR% ran 0.280 % … 0.888 %.
+
+🔴 **CONSEQUENCE FOR ANY FUTURE ENTRY-QUALITY MEASUREMENT: COUNT THESE FOUR SEPARATELY.**
+Pooling them with trades that had a real chance and lost describes the entry filter using rows
+whose outcome the entry filter could not have changed.
+
+⚠️ **AND THE HALF THAT KILLS THE OBVIOUS FIX:** a wider stop lowers the toll — but the
+2026-08-30 15:00 sweep found widening **monotonically worse** on outcomes. At k=5.0 the toll saves
+**−0.692R** across the whole live book against a payoff loss of **−18.87R** (full) / **−14.95R**
+(clean). **27:1 against.** And the set of trades that clear the toll is **invariant to k** — both
+MFE_R and the toll carry `k` in the denominator, so it cancels: **10/14 at every level, by
+construction, not by measurement.**
 
 ## 🔴🔴 §0.FIRSTLIVE — THE FIRST LIVE TRADE IS **NOT IN THE DATABASE**. 2026-07-29 20:05:13 UTC
 
