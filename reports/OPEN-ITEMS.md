@@ -10,17 +10,27 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `a0c77f2`, re-verified at 2026-08-30 19:40 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `2bea657`, re-verified at 2026-08-30 20:30 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header value `3888504`, kept for audit — see §0.CARDLABEL immediately below.)*
+*(previous header values `3888504` then `a0c77f2`, kept for audit — see §0.CARDLABEL below.)*
 
-## 🔴🔴 §0.CARDLABEL — `a0c77f2` IS ON DISK AND **NOT LOADED**. 2026-08-30 19:40 UTC
+## ✅ §0.CARDLABEL — `a0c77f2` + `2bea657` **LOADED LIVE 2026-08-30 15:34:05 UTC**
 
-**THIS IS A DEPLOYMENT GAP AND IT IS DELIBERATE.** `a0c77f2` is committed to `titan-bot/` but
-`titan.service` has **NOT** been restarted, because **vpos 100 (LONG, opened 2026-08-30 13:05:16)
-is open** and the operator alone decides when Titan restarts under a live position.
-**Until that restart the running worker still executes `3888504` and still sends the OLD cards.**
-Anyone reading a Titan close card before the restart is reading the old rendering.
+**The deployment gap recorded here earlier is CLOSED.** Restarted by operator decision
+**under the open vpos 100**, and the position came through untouched:
+
+| check | result |
+|---|---|
+| vpos 100 fields before vs after (all 44) | **0 changed** — incl. `water_mark` 78932.6, `sl_price` 78204.5, `filled_legs`, `pending_dca_limits`, `recheck_status` |
+| venue `STOP_MARKET` `orderId` | **2094048810753437696 — unchanged** |
+| 🔴 venue stop `updateTime` | **1788095116686 — UNCHANGED.** The restart did **not** write to the protective stop |
+| venue stop `stopPrice` | **78204.5 — unchanged**; open-order count 1 → 1 |
+| boot reconcile | `RECONCILE-XDB ✅ exchange and DB agree: 1 exchange position(s), 1 open row(s)`; `LONG open, SL present @ 78204.5 — kept`; no breakeven job enqueued (single owner); no orphaned orders; no traceback |
+
+**Loaded bytecode confirms all three fixes** (`.pyc` headers VALID against every source):
+`_do_close` references `stop_order_id` at both call sites; `close_report.telegram` carries
+`REAL MONEY — Trade Closed` / `PAPER — SIMULATED` and the notional; `main._batch_running_block`
+carries the REAL/paper split.
 
 **What `a0c77f2` changes — DISPLAY AND ONE STORED FIELD, NO TRADING RULE:**
 
@@ -45,10 +55,19 @@ block). Therefore *"a live row whose stop placement failed"* **cannot exist**. V
 **0** rows opened after go-live with `stop_order_id IS NULL`, **0** rows opened before it with a
 non-NULL one. Titan has **no `is_paper` column**; `stop_order_id` is the only live marker.
 
-⚠️ **STILL UNFIXED, DELIBERATELY:** the cumulative batch line (`main.py:429-441`) still pools paper
-with live. Batch #2 (2026-07-04 → 08-07) straddles the go-live and showed **−$833.09**, mixing
-$10,000 paper trades with $150 live ones. Two options were put to the operator and **neither is
-applied**; this is a decision, not a patch.
+✅ **THE CUMULATIVE BATCH LINE IS FIXED TOO — `2bea657`, OPTION A by operator decision.**
+`_batch_running_block` now renders two ADDITIONAL lines, `REAL` and `paper`, from
+`stop_order_id IS NOT NULL`. **The canonical total and win-rate still come from the `trades`
+query — the locked window — and are UNCHANGED; no history was rewritten and no batch re-numbered.**
+What the split reveals on the existing book:
+
+| batch | canonical Net | 🔴💵 REAL | 🧪 paper |
+|---|---|---|---|
+| 1 | +$1 342.33 (n=30) | n=0 · +$0.00 | n=27 · +$1 342.09 |
+| **2** | **−$833.09 (n=30)** | **n=8 · −$4.30** | **n=22 · −$828.80** |
+| 3 | −$4.93 (n=6) | n=6 · −$4.93 | n=0 · +$0.00 |
+
+**The −$833.09 that has been on every card since 29.07 is −$4.30 of real money and −$828.80 of paper.**
 
 ## 🔴🔴 §0.FIRSTLIVE — THE FIRST LIVE TRADE IS **NOT IN THE DATABASE**. 2026-07-29 20:05:13 UTC
 
