@@ -10,9 +10,9 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `9c40a4f`, re-verified at 2026-08-31 15:30 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `f5d3542`, re-verified at 2026-08-31 15:35 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
 
 **`c66a900` — two PROMPT-legibility fixes on the exit prompt (entry ADX15m now rendered;
 percentile rows stamped NOW and declared as four different objects). Legibility of existing
@@ -22,7 +22,38 @@ facts only — no new guidance, no threshold. `_CLOSE_SYSTEM_RICH` byte-identica
 15m/5m (82/84 populated, NULL prints `not recorded`); 1d/4h/1h are marked ENTRY-ONLY because
 the sample table has no such column at all (313/313). `_CLOSE_SYSTEM_RICH` byte-identical.**
 
-## 📋 §0.PROMPT-PAIRING — ONE INSTANCE OF THE CLASS REMAINS. NOT FIXED, RECORDED.
+## ✅ §0.PROMPT-PAIRING — **CLASS CLOSED 2026-08-31. FOUR INSTANCES, ALL FIXED. SWEEP COMPLETE.**
+
+**One defect class, found and closed in a single day:
+*the header promises a comparison the values do not contain*.**
+
+| # | instance | what the header promised vs what it carried | date | commit |
+|---|---|---|---|---|
+| 1 | **ADX15m** — `Regime at ENTRY vs NOW` printed ADX1h at entry, ADX1h **and** ADX15m now | model took the only "entry ADX" it had (the 1h one). vpos 90: inflated a "spike" from +9.6 to +26.5 | 2026-08-31 | **`c66a900`** |
+| 2 | **wall percentiles** — four CURRENT values of four DIFFERENT objects as a bare list | vpos 96: read "supporting wall 72→70th pct" across two different walls. Root: the block's own NOTE says judge by PERCENTILE, but entry→now exists only as MULTIPLES | 2026-08-31 | **`c66a900`** |
+| 3 | **trend rows** — entry printed 1d/4h/1h, now printed 15m/5m; **intersection EMPTY** | `1h=bear` beside `15m=neutral` reads as a reversal nobody measured | 2026-08-31 | **`9c40a4f`** |
+| 4 | **`Volume:` line** — inside the same ENTRY-vs-NOW block, `vol_1h`/`vol_15m` CURRENT-ONLY | vpos 90's 15m volume had collapsed 5.60 → 0.43 and the advisor was shown only "0.43" | 2026-08-31 | **`f5d3542`** |
+
+**In every one of the four the entry-side data ALREADY EXISTED in the same DB row and was simply
+not SELECTed** — `srv_adx_15m` 84/84, `trend_15m`/`trend_5m` 82/84, `srv_vol_ratio_1h`/`_15m` 84/84.
+**Nothing was fabricated in any of the four fixes.** A NULL prints `not recorded`, never a
+neighbouring timeframe. Where a pair can never exist (1d/4h/1h have no current column at all,
+313/313; the opposing wall has no entry multiple; no percentile has an entry value) the absence is
+STATED, not omitted.
+
+🔴 **SWEEP COMPLETE.** The full prompt was rendered and every block re-read against the question
+"does the header or wording imply a relationship the values do not support?". After instance 4,
+**no further instance of this class remains**: the book block, percentile block, cost block,
+MFE/giveback identity, entry tiers, 5m structure and protection block were each checked and are
+clean.
+
+⚠️ **LESSER NOTE, RECORDED AND DELIBERATELY NOT FIXED.** `Since the previous consultation
+(1.0h into the position)` renders `prev_age_h`, which is the **age of the PREVIOUS reading**, not
+the interval between the two readings. A reader may take it for the gap. **This is an ambiguity,
+not a false statement — the values under it are correct** — so it is recorded here rather than
+changed. It does not belong to the class above.
+
+## 📋 (superseded) — the entry that opened this section on 2026-08-31 before instance 4 was fixed
 
 **2026-08-31, after three fixes of "the header promises a comparison the values do not deliver".**
 🔴 **The `Volume:` line sits INSIDE the "Regime at ENTRY vs NOW" block and carries two
