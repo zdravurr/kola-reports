@@ -10,13 +10,31 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `c66a900`, re-verified at 2026-08-31 15:15 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `9c40a4f`, re-verified at 2026-08-31 15:30 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
 
 **`c66a900` — two PROMPT-legibility fixes on the exit prompt (entry ADX15m now rendered;
 percentile rows stamped NOW and declared as four different objects). Legibility of existing
 facts only — no new guidance, no threshold. `_CLOSE_SYSTEM_RICH` byte-identical.**
+
+**`9c40a4f` — third and last of the same class: the trend rows now OVERLAP. Entry gains
+15m/5m (82/84 populated, NULL prints `not recorded`); 1d/4h/1h are marked ENTRY-ONLY because
+the sample table has no such column at all (313/313). `_CLOSE_SYSTEM_RICH` byte-identical.**
+
+## 📋 §0.PROMPT-PAIRING — ONE INSTANCE OF THE CLASS REMAINS. NOT FIXED, RECORDED.
+
+**2026-08-31, after three fixes of "the header promises a comparison the values do not deliver".**
+🔴 **The `Volume:` line sits INSIDE the "Regime at ENTRY vs NOW" block and carries two
+CURRENT-ONLY values — `vol_1h`, `vol_15m` — with no entry counterpart and no unpaired label.**
+Only `ATR change vs entry` on that line is explicitly a delta.
+
+**The entry-side data EXISTS and is fully populated: `trades.srv_vol_ratio_1h` and
+`srv_vol_ratio_15m`, 84 of 84 executed entry rows** — exactly the shape `trend_15m` and
+`srv_adx_15m` had before their fixes.
+
+⚠️ **DELIBERATELY NOT FIXED IN THAT PASS** — the brief said report, fix nothing further.
+Awaiting the operator's decision, as the trend row did.
 
 ## 📋 §0.CONFIDENCE — MEASURED FACT, RECORDED ONLY. **NO ACTION TAKEN OR PROPOSED.**
 
