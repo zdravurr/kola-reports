@@ -10,9 +10,27 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `ed95160`, re-verified at 2026-08-31 14:15 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `c66a900`, re-verified at 2026-08-31 15:15 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`c66a900` — two PROMPT-legibility fixes on the exit prompt (entry ADX15m now rendered;
+percentile rows stamped NOW and declared as four different objects). Legibility of existing
+facts only — no new guidance, no threshold. `_CLOSE_SYSTEM_RICH` byte-identical.**
+
+## 📋 §0.CONFIDENCE — MEASURED FACT, RECORDED ONLY. **NO ACTION TAKEN OR PROPOSED.**
+
+**2026-08-31.** Across **159** stored exit consultations the advisor's `confidence` field takes
+**five distinct values in total**: 0.72 (94), 0.62 (51), 0.78 (9), 0.68 (3), 0.0 (2).
+🔴 **Every `close` verdict without exception is either 0.72 (54 times) or 0.78 (9 times).**
+`hold` is mostly 0.62 (51) or 0.72 (40).
+
+**It is practically a constant and carries almost no information.** Recorded here so nobody
+later reads it as a graded signal — it is not one.
+
+⚠️ **DELIBERATELY NOT ACTED ON.** Nothing in the prompt asks the model to vary it, and nothing
+should: instructing a model to spread a number teaches it to produce spread, not to know more.
+**No change was made to this field, and none is proposed.**
 
 **`ed95160` — the exit advisor is given the FIFTH fact: the peak the trailing contract needs
 (`required_MFE`, closed form, no look-ahead). Prompt builder only; `_CLOSE_SYSTEM_RICH` byte-identical;
