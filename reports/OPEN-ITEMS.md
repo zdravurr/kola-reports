@@ -10,9 +10,13 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `7ba8241`, re-verified at 2026-08-30 23:58 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `ed95160`, re-verified at 2026-08-31 14:15 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`ed95160` — the exit advisor is given the FIFTH fact: the peak the trailing contract needs
+(`required_MFE`, closed form, no look-ahead). Prompt builder only; `_CLOSE_SYSTEM_RICH` byte-identical;
+no constant touched; insertions only. Applied and LOADED from FLAT — see §0.REASONCAP.**
 
 ## 🔴🔴 §0.CASCADE-STOP — NEW STOPPING RULE, OPERATOR DECISION 2026-08-30. **SUPERSEDES THE 2026-08-21 RULE.**
 
@@ -57,10 +61,15 @@ measurement made before the fact — it is not a measurement.
 ⚠️ `HTF_REARM_COOLDOWN_MINUTES` and `HTF_REARM_DRYRUN` **do not exist in that .bak** — they were
 ADDED by the port. Reverting means **removing** them, not restoring a prior value.
 
-## 🔴 §0.REASONCAP — `7ba8241` IS ON DISK AND **NOT LOADED**. 2026-08-30 23:58 UTC
+## ✅ §0.REASONCAP — **CLOSED 2026-08-31 14:03 UTC. `7ba8241` IS NOW LOADED.**
 
-**DEPLOYMENT GAP, DELIBERATE — vpos 100 is open and the operator decides the restart.
-Until then exit reasons are STILL being cut at 400 characters.**
+**The deployment gap is over.** It was opened deliberately on 2026-08-30 23:58 because vpos 100 was
+open and the restart was the operator's call. **vpos 100 closed on 2026-08-30 17:18; Titan has been
+FLAT since.** The `ed95160` restart at **2026-08-31 14:03:41 UTC** was performed from 0 open
+positions and loaded `7ba8241` along with it. **Exit reasons are no longer cut at 400 characters —
+the 400 → 1200 raise is in the running process.** `NRestarts=0`, `ActiveState=active`, journal clean.
+
+*(historical record of the gap follows, kept for audit)*
 
 **The cap was not an occasional nuisance — it was truncating almost everything.** Measured over
 **157** stored exit consultations: **median `ai_reason` length = 400, and 151 of 157 (96 %) sat at
