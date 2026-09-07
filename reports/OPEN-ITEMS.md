@@ -10,9 +10,24 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `652bb10`, re-verified at 2026-09-07 11:45 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `3b075fd`, re-verified at 2026-09-07 13:35 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`3b075fd` — 🔴 THE BOOK GATE IS APPLIED AND LIVE, IN DRYRUN. IT REFUSES NOTHING.**
+`BOOK_GATE_ENABLED = True`, **`BOOK_GATE_DRYRUN = True`**, `BOOK_GATE_CLAUSE_A_ENABLED = True`,
+`BOOK_GATE_CLAUSE_B_ENABLED = False` — read out of the bytecode the running worker loaded.
+Four files: `config.py`, `main.py`, `skip_attribution.py`, and the new `book_gate.py`.
+The six `book_gate_*` columns are written on EVERY scored row **before** the dryrun branch,
+so telemetry accrues from the first signal while **zero decisions change** — which is why
+this could be applied without confounding the cascade experiment (unchanged at **9 closed /
+ΣR −4.2353**). Clause B ships **disarmed on measurement**: its only historical LONG refusal
+is vpos 94, +0.8650R, the largest winner of the live batch. **ARMING IS A SEPARATE DECISION,
+still owed to the operator after the cascade experiment resolves.** Applied from flat
+(0 open rows, 0 BingX positions on both probes). `config.py` and `main.py` have ZERO removed
+lines; the whole diff removes exactly one line, `skip_attribution`'s tuple terminator.
+Review point: **200 gate evaluations, IN ROWS NOT DAYS**, counted from 0 at the 13:29:26 restart.
+Record: reports/2026-09-07-1345-titan-book-gate-applied-live-in-dryrun.md
 
 **`652bb10` — COMMENT ONLY. `config.py:611` stated the cascade stopping rule as the
 cancelled "20 closed positions or 30 days"; corrected to the rule in force since
