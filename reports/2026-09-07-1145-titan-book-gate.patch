@@ -1,0 +1,637 @@
+--- a/titan-bot/config.py
++++ b/titan-bot/config.py
+@@ -1022,3 +1022,144 @@
+ # adaptive_trail_events (frozen vs fresh trail, ATR, band clamps). Changes NO
+ # verdict, NO threshold, NO stop. Rollback = False + restart (kills both writers).
+ SENSOR_EVENT_LOGGING_ENABLED = True
++
++# ═══════════════════════════════════════════════════════════════════════════
++# 🔴 ORDER-BOOK ENTRY GATE — designed 2026-09-07, NOT YET APPLIED TO THE TREE
++# ═══════════════════════════════════════════════════════════════════════════
++# THE OPERATOR'S STANDING REQUIREMENT, ON RECORD SINCE 2026-08-10: the order book
++# must take part in the entry decision MECHANICALLY, in code, BEFORE the advisor.
++# On Mercury-SOL the same mechanism refuses 44 entries in 28 days, 22/22 across the
++# sides. On Titan it did not exist at all: `WALL_AVOIDANCE_ENABLED` is not a name
++# in the tree, and 79,745 rows of OKX books-full depth-4000 reach the prompt and
++# are consumed by zero gates.
++#
++# 🔴 THE HONEST BASIS, VERBATIM, AND NO FUTURE SESSION MAY SOFTEN IT:
++#     Your own §2c established that this gate would NOT have refused vpos 102 or
++#     103. It is being built because a bot that buys into a wall is doing something
++#     a trader would not do, not because the data promises money. That is
++#     DISCIPLINE, not a measured edge — the same wording SOL's gate carries. If a
++#     later pass measures it and finds no edge, that is the EXPECTED result and NOT
++#     grounds to remove it. Grounds to remove it are: it fires too often, it fires
++#     asymmetrically by side, or it refuses trades a trader would take.
++#
++# ── THE SWITCHES ────────────────────────────────────────────────────────────
++#   BOOK_GATE_ENABLED = False
++#       THE KILL SWITCH. Nothing is read, nothing is refused, the six book_gate_*
++#       columns are written EMPTY on every row, no card, no log. Cost: the
++#       telemetry stops at the same moment, so you go blind as you go safe.
++#   BOOK_GATE_DRYRUN = True
++#       STOPS IT BLOCKING, KEEPS EVERYTHING ELSE. The book is still read, the six
++#       columns are still written on EVERY scored row (they are written BEFORE the
++#       dryrun branch, deliberately), the would-refuse is still logged. Nothing is
++#       refused, no card, no book_blocked row, no skip_attribution entry.
++#   BOOK_GATE_CLAUSE_A_ENABLED / BOOK_GATE_CLAUSE_B_ENABLED
++#       The two clauses are INDEPENDENT claims and carry INDEPENDENT flags, so one
++#       can be disarmed without the other and the telemetry still says which did
++#       the work. B ships disarmed; see its block below for the measurement.
++BOOK_GATE_ENABLED         = True
++BOOK_GATE_DRYRUN          = True    # 🔴 SHIPS IN DRYRUN. See SEQUENCING at the end
++                                    # of this block — the cascade experiment stands
++                                    # at 9 of 10 closes and ΣR −4.2353 of −5.0R, and
++                                    # a second entry-side mechanism armed now would
++                                    # confound it beyond repair.
++BOOK_GATE_CLAUSE_A_ENABLED = True   # "do not trade into a wall"
++BOOK_GATE_CLAUSE_B_ENABLED = False  # "do not enter where there is nothing to enter
++                                    # into" — 🔴 DISARMED ON MEASUREMENT, see below.
++#
++# ── CLAUSE A — "do not trade into a wall". BOTH conditions must hold. ────────
++BOOK_GATE_WALL_PCTL      = 85.0   # percentile of the nearest OPPOSING wall, ON ITS
++                                  # OWN SIDE (book_gate._NEAR_MULT_BREAKS, cut from
++                                  # Titan's own gate population — NOT SOL's table).
++                                  # 🔴 SOL's numbers are not merely mis-scaled here,
++                                  # they are inert: on SOL's ruler the MEDIAN Titan
++                                  # wall reads p5 and the SHORT side never exceeds
++                                  # p18, so clause A would refuse 0.00 % of SHORTs.
++# 🔴 THE DISTANCE CUT IS PER SIDE, AND THAT IS A DEPARTURE FROM SOL ON PURPOSE.
++# SOL carries a single 0.20 % because its two sides agree (LONG Q1 0.20 %, SHORT
++# 0.19 %). Titan's do not: at the same quantile the LONG cut is 0.0306 % and the
++# SHORT cut 0.0597 %, a factor of 2.0. A single constant across sides on Titan is
++# itself the side ban the percentile ruler exists to prevent. Values are the 15th
++# percentile of EACH SIDE'S OWN nearest-opposing distance distribution, over the
++# rows that reached the gate.
++BOOK_GATE_WALL_DIST_PCT  = {
++    'LONG':  0.0306,
++    'SHORT': 0.0597,
++}
++#
++# ── CLAUSE B — "do not enter where there is nothing to enter into" ───────────
++# 🔴 SHIPS DISARMED (BOOK_GATE_CLAUSE_B_ENABLED = False). BOTH halves were cut on
++# the right population and BOTH failed the pre-registered bar. Written down because
++# a threshold that was measured and rejected is worth more than one that was never
++# tried, and because the day Titan's book changes, the numbers are already here.
++#
++#   HALF ONE — the supporting-wall floor at SOL's value of 1:
++#       LONG 4.26 % (4 of 94)   SHORT 0.00 % (0 of 105)   ratio: unbounded.
++#     On SOL this test is a measured NO-OP: over 3,454 signals the minimum
++#     supporting count is 1 and zero never occurs. On Titan zero occurs, on one
++#     side only. That is not the same test wearing the same constant — Titan's wall
++#     bucket is 5.0 USD on an ~80,000 USD instrument (6.3e-5 of price) against
++#     SOL's 0.50 on ~150 (3.3e-3), a 53x finer bin, so "number of supporting walls"
++#     is not the same quantity on the two bots and must not carry the same number.
++#
++#   HALF TWO — the lean floor at p2 of each side's own distribution:
++#       LONG 1.06 % (1 of 94)   SHORT 2.86 % (3 of 105)   ratio 2.70x.
++#     🔴 AND THE DISQUALIFYING FACT: the ONE LONG row it fires on is trades row
++#     25090 = vpos 94, 2026-08-17, +0.8650R on a trail — the single largest winner
++#     of the live batch. Its only historical refusal is the best trade in the
++#     sample. Filter 21 died on SOL for exactly this and this rule dies with it.
++#     🔴 THE FLOORS WERE NOT LOOSENED TO SPARE THAT TRADE. Sparing it requires a
++#     LONG floor below 0.3640, i.e. below the observed minimum, which is a no-op
++#     wearing a threshold's name. The clause is switched OFF and says so.
++BOOK_GATE_MIN_SUPPORTING = 1      # inert while CLAUSE_B is False; kept at SOL's
++                                  # value so arming the clause arms SOL's rule and
++                                  # not a quietly retuned one.
++BOOK_GATE_LEAN_FLOOR = {          # 2nd percentile of EACH SIDE'S OWN lean
++    'LONG':  0.4172,              # distribution, cut over the rows the GATE
++    'SHORT': 0.3844,              # EVALUATES — not over all book snapshots.
++}
++#
++# 🔴 THE POPULATION, BECAUSE THIS IS THE ONE THAT GOES WRONG. Every number above is
++# cut over the 199 rows carrying `advisor_book_json` (94 LONG / 105 SHORT,
++# 2026-08-03 → 2026-09-07): the rows that survived the HTF cascade, the EMA
++# envelope gate, the score bar, the filter list and the risk gate, i.e. the rows
++# this gate will actually judge. That window is not a choice — `advisor_book_json`
++# only exists from 2026-08-03, so the correct population is not reconstructible
++# further back, exactly as on SOL.
++#   THE WRONG CUT, FOR CONTRAST: the same p2 taken over the 79,745-row
++#   `orderbook_density` collector table (every 60 s, whether or not any signal
++#   existed) gives LONG 0.3506 / SHORT 0.3933 — and replaying THOSE floors over the
++#   population the gate judges refuses 0.00 % of LONGs and 3.81 % of SHORTs. Same
++#   quantity, wrong population, and a one-sided rule out the other end. This is the
++#   category error SOL's 2026-08-14 re-cut is a monument to.
++#   🔴 The 0.3505 quoted in reports/2026-09-07-1028-*.md §3c is that wrong cut with
++#   both sides pooled. It is superseded by the two numbers above.
++#
++# ── PRE-REGISTERED 2026-09-07, SAME WIRES AS SOL'S ──────────────────────────
++#   | quantity              | expected  | source                                 |
++#   | refusal rate LONG     | 4.26 %    | replay of the REAL evaluate() over the |
++#   | refusal rate SHORT    | 3.81 %    | 199 books that reached the gate        |
++#   | side ratio            | 1.12x     | the number that says "rule", not "ban" |
++#   | clause A / clause B   | 100 % / 0 %  B is disarmed; every refusal is A    |
++#   | entries refused       | 0 of 12 judgeable entries; 0 of 71 closed positions |
++#   | entries/day after     | 0.432/day, unchanged on the record (upper bound if |
++#   |                       | refusals were execution-representative: 0.415/day) |
++#   | review point          | 200 gate evaluations — IN ROWS, NOT DAYS, because  |
++#   |                       | 199 rows took 35 days and a calendar review would   |
++#   |                       | grade a sample that had not arrived yet.           |
++# 🔴 IF THE REALISED RATE IS MATERIALLY DIFFERENT — ABOVE 5 % ON EITHER SIDE, OR A
++# SIDE RATIO ABOVE 2x — THAT IS A FINDING ABOUT THE CALIBRATION AND GROUNDS TO
++# REVISIT. IT IS NOT A REASON TO LOOSEN THE THRESHOLD QUIETLY. Re-cut over rows
++# that reached the gate, per side, and report both cuts.
++# 🔴 GRANULARITY WARNING: n = 94 / 105. ONE row is 1.06 % / 0.95 %. Every rate above
++# carries roughly a one-point step, and the four LONG refusals include three
++# fetches of the SAME book second (rows 26330/26331/26332, 2026-08-23 03:45:04).
++# Deduplicated to distinct books the LONG population is 74, not 94. Do not read
++# these percentages to two decimal places.
++#
++# ── 🔴 SEQUENCING — NOT NEGOTIABLE ──────────────────────────────────────────
++# The cascade experiment (`HTF_NEUTRAL_REQUIRE_15M_DRYRUN`, above) stands at 9 of
++# 10 closes and ΣR −4.2353 of −5.0R: ONE close worse than −0.765R closes both arms
++# of its stopping rule at once. Arming a second entry-side mechanism before that
++# resolves confounds it beyond repair. BOOK_GATE_DRYRUN stays True until the
++# operator applies it; the six columns and the would-refuse log accrue meanwhile.
++# Record: reports/2026-09-07-1145-titan-the-book-gate-designed-and-one-clause-refused-a-winner.md
+--- a/titan-bot/main.py
++++ b/titan-bot/main.py
+@@ -239,6 +239,20 @@
+             # Mirrors mercury-sol's `advisor_book_json` (2026-08-02) deliberately —
+             # same defect class, same remedy, so the two bots stay comparable.
+             ('advisor_book_json', 'TEXT'),
++            # 🔴 THE BOOK GATE'S OWN INPUTS, ON EVERY SCORED ROW — ADMITTED OR NOT
++            # (2026-09-07). Not the JSON: the four numbers the rule actually
++            # compared, plus which clause fired and how much supporting depth
++            # there was. Written BEFORE the dryrun branch, deliberately, so the
++            # telemetry accrues from day one and not only on refusals.
++            # Columns, not a blob, for the reason `orderbook_json` teaches: a JSON
++            # column gets OVERWRITTEN by a later capture and the rows destroyed are
++            # exactly the ones that became positions. Columns cannot be.
++            ('book_gate_clause',       'TEXT'),
++            ('book_gate_opp_mult',     'REAL'),
++            ('book_gate_opp_pctl',     'REAL'),
++            ('book_gate_opp_dist_pct', 'REAL'),
++            ('book_gate_lean',         'REAL'),
++            ('book_gate_n_supporting', 'INTEGER'),
+             # EMA 9/21 named columns for optimizer learning (2026-05-17)
+             ('ema_cross_15m', 'TEXT'),
+             ('ema_cross_1h', 'TEXT'),
+@@ -514,6 +528,7 @@
+     return f"🔄 Batch #{batch_number}: Trade <b>{trade_count}/{BATCH_SIZE}</b>"
+ 
+ 
++from config import BOOK_GATE_DRYRUN   # 🔴 2026-09-07 book gate
+ from config import (
+     LEVERAGE, RISK_BASE_USDT, RISK_PER_TRADE_PCT, SL_ATR_MULT,
+     MAX_MARGIN_PCT_PER_TRADE, TRAIL_MULT_ATR, ATR_LEN, SL_ATR_TF, TRAIL_ATR_TF,
+@@ -559,6 +574,7 @@
+ import virtual_trader
+ from post_exit_observatory import on_15m_exit_signal
+ import skip_attribution
++import book_gate           # 🔴 2026-09-07: the ORDER BOOK as a mechanical entry precondition
+ # Wire virtual_trader poller closes into the batch counter.
+ virtual_trader.register_batch_fn(_increment_batch_and_stamp)
+ # Wire the per-close running cumulative batch block into the close report.
+@@ -2328,6 +2344,91 @@
+     pre_trade_walls = liquidity_zones.fetch_pre_trade_walls(symbol)
+     _snap = _request_snapshot()
+ 
++    # ── 🔴 BOOK GATE — THE ORDER BOOK DECIDES, BEFORE THE ADVISOR DOES ────
++    #
++    # WHY EXACTLY HERE, between the fetch above and the consult below:
++    #  · It needs `pre_trade_walls`, fetched a few lines above. Earlier is
++    #    impossible — there is no book before the fetch.
++    #  · It must be BEFORE `consult_for_entry`. On vpos 102 the advisor read an
++    #    ASK-heavy book — the book leaning AGAINST a LONG — and wrote "imbalance
++    #    ask-heavy favors entry"; on vpos 103 it named the opposing wall's 91st
++    #    percentile, called it "genuine", and entered anyway. A model which can
++    #    read "ask-heavy" as "favors entry" must never get the chance to
++    #    trade through a wall. Putting the rule after the advisor would let its
++    #    "execute" arrive first and make the gate a second-guesser instead of a
++    #    precondition.
++    #  · It reads THE SAME `pre_trade_walls` object handed to consult_for_entry
++    #    below — not a second fetch. One fact, one snapshot: the gate and the
++    #    prompt can never disagree about what the book was, which is the defect
++    #    class this project keeps closing.
++    #  · It is LAST among the cheap gates and FIRST among the expensive ones: the
++    #    HTF cascade, the EMA envelope gate, the score bar, the filter list and
++    #    the risk gate have all already passed, so it costs nothing on the common
++    #    path and it saves the Claude call on the entries it refuses.
++    #
++    # 🔴 IT NEVER RAISES AND IT FAILS OPEN. An unreadable book, an OKX outage, an
++    # unrankable multiplier, a mid of zero — every one of them ADMITS. OKX is a
++    # third venue this bot does not trade on; an outage there must not become a
++    # trading halt here.
++    try:
++        _book_verdict = book_gate.evaluate(pre_trade_walls, direction)
++    except Exception as _bg_err:
++        print(f"[TITAN][BOOK-GATE] evaluate failed (non-fatal, ADMITTING) "
++              f"row={row_id}: {type(_bg_err).__name__}: {_bg_err}", flush=True)
++        _book_verdict = {'refuse': False, 'clause': None,
++                         'reason': f'gate error: {_bg_err}', 'facts': {}}
++    _bf = _book_verdict.get('facts') or {}
++    # Persist the gate's own inputs on EVERY scored row, admitted or not, and
++    # BEFORE the dryrun branch — telemetry accrues even while nothing is refused.
++    if row_id:
++        update_signal_execution(
++            row_id,
++            book_gate_clause=(_book_verdict.get('clause') or ''),
++            book_gate_opp_mult=_bf.get('opp_mult'),
++            book_gate_opp_pctl=_bf.get('opp_pctl'),
++            book_gate_opp_dist_pct=_bf.get('opp_dist_pct'),
++            book_gate_lean=_bf.get('lean'),
++            book_gate_n_supporting=_bf.get('n_supporting'))
++    if _book_verdict.get('refuse'):
++        _bg_line = (f"[BOOK-GATE] {'DRYRUN would-refuse' if BOOK_GATE_DRYRUN else 'REFUSE'} "
++                    f"{direction} row={row_id} clause={_book_verdict['clause']}: "
++                    f"{_book_verdict['reason']}")
++        print(f"[TITAN]{_bg_line}", flush=True)
++        if not BOOK_GATE_DRYRUN:
++            update_signal_execution(row_id, status='book_blocked', combo_key=combo,
++                                    confluence_score=_gated_score,
++                                    ai_reason=_book_verdict['reason'][:200])
++            # Drift-tracked from the FIRST refusal. A gate whose refusals cannot
++            # be measured later is how the FLAT floor's 518 refusals stayed
++            # invisible for a month on this very bot.
++            _record_skip_attribution(row_id, symbol, direction, 'book_blocked',
++                                     matrix_result=matrix_result,
++                                     confluence_score=_gated_score,
++                                     pre_trade_walls=pre_trade_walls,
++                                     ai_reason=_book_verdict['reason'])
++            # The card names the wall, its percentile, its distance and WHICH
++            # CLAUSE fired. The two clauses are different claims; a combined flag
++            # would hide which one is doing the work.
++            _bg_w = (f"wall x{_bf['opp_mult']:.1f} @ {_bf['opp_price']:.1f} "
++                     f"(p{_bf['opp_pctl']:.0f} this side, {_bf['opp_dist_pct']:.4f}% away)"
++                     if _bf.get('opp_mult') is not None and _bf.get('opp_pctl') is not None
++                     else "no rankable opposing wall")
++            send_tg(
++                f"\U0001F4D5 <b>BOOK REFUSED ENTRY</b> (clause {_book_verdict['clause']})\n"
++                f"\U0001F48E {symbol}  \U0001F3AF {direction}\n"
++                f"<i>{_book_verdict['reason']}</i>\n"
++                f"{_bg_w} | lean {(_bf.get('lean') if _bf.get('lean') is not None else float('nan')):.4f} "
++                f"| supporting {_bf.get('n_supporting')}\n"
++                f"{dxy_tag(_macro_ctx)}\n"
++                f"<i>discipline rule, not a measured edge — see config BOOK_GATE_*</i>\n"
++                f"<code>{combo}</code>"
++            )
++            return jsonify({"status":    "book_blocked",
++                            "direction": direction,
++                            "clause":    _book_verdict['clause'],
++                            "reason":    _book_verdict['reason'],
++                            "combo":     combo}), 200
++
+     snapshot = _sm_snap  # Bug-1 fix: reuse the atomic capture from the slot write
+     advice = claude_advisor.consult_for_entry(
+         symbol, snapshot, weight_used, news_summary=claude_news_summary,
+@@ -4603,6 +4704,91 @@
+     _ema_slope_15m = indicators.ema_slope_label(_snap, '15m')
+     _ema_slope_1h = indicators.ema_slope_label(_snap, '1h')
+ 
++    # ── 🔴 BOOK GATE — THE ORDER BOOK DECIDES, BEFORE THE ADVISOR DOES ────
++    #
++    # WHY EXACTLY HERE, between the fetch above and the consult below:
++    #  · It needs `pre_trade_walls`, fetched a few lines above. Earlier is
++    #    impossible — there is no book before the fetch.
++    #  · It must be BEFORE `consult_for_entry`. On vpos 102 the advisor read an
++    #    ASK-heavy book — the book leaning AGAINST a LONG — and wrote "imbalance
++    #    ask-heavy favors entry"; on vpos 103 it named the opposing wall's 91st
++    #    percentile, called it "genuine", and entered anyway. A model which can
++    #    read "ask-heavy" as "favors entry" must never get the chance to
++    #    trade through a wall. Putting the rule after the advisor would let its
++    #    "execute" arrive first and make the gate a second-guesser instead of a
++    #    precondition.
++    #  · It reads THE SAME `pre_trade_walls` object handed to consult_for_entry
++    #    below — not a second fetch. One fact, one snapshot: the gate and the
++    #    prompt can never disagree about what the book was, which is the defect
++    #    class this project keeps closing.
++    #  · It is LAST among the cheap gates and FIRST among the expensive ones: the
++    #    HTF cascade, the EMA envelope gate, the score bar, the filter list and
++    #    the risk gate have all already passed, so it costs nothing on the common
++    #    path and it saves the Claude call on the entries it refuses.
++    #
++    # 🔴 IT NEVER RAISES AND IT FAILS OPEN. An unreadable book, an OKX outage, an
++    # unrankable multiplier, a mid of zero — every one of them ADMITS. OKX is a
++    # third venue this bot does not trade on; an outage there must not become a
++    # trading halt here.
++    try:
++        _book_verdict = book_gate.evaluate(pre_trade_walls, direction)
++    except Exception as _bg_err:
++        print(f"[TITAN][BOOK-GATE] evaluate failed (non-fatal, ADMITTING) "
++              f"row={row_id}: {type(_bg_err).__name__}: {_bg_err}", flush=True)
++        _book_verdict = {'refuse': False, 'clause': None,
++                         'reason': f'gate error: {_bg_err}', 'facts': {}}
++    _bf = _book_verdict.get('facts') or {}
++    # Persist the gate's own inputs on EVERY scored row, admitted or not, and
++    # BEFORE the dryrun branch — telemetry accrues even while nothing is refused.
++    if row_id:
++        update_signal_execution(
++            row_id,
++            book_gate_clause=(_book_verdict.get('clause') or ''),
++            book_gate_opp_mult=_bf.get('opp_mult'),
++            book_gate_opp_pctl=_bf.get('opp_pctl'),
++            book_gate_opp_dist_pct=_bf.get('opp_dist_pct'),
++            book_gate_lean=_bf.get('lean'),
++            book_gate_n_supporting=_bf.get('n_supporting'))
++    if _book_verdict.get('refuse'):
++        _bg_line = (f"[BOOK-GATE] {'DRYRUN would-refuse' if BOOK_GATE_DRYRUN else 'REFUSE'} "
++                    f"{direction} row={row_id} clause={_book_verdict['clause']}: "
++                    f"{_book_verdict['reason']}")
++        print(f"[TITAN]{_bg_line}", flush=True)
++        if not BOOK_GATE_DRYRUN:
++            update_signal_execution(row_id, status='book_blocked', combo_key=combo,
++                                    confluence_score=adj_score,
++                                    ai_reason=_book_verdict['reason'][:200])
++            # Drift-tracked from the FIRST refusal. A gate whose refusals cannot
++            # be measured later is how the FLAT floor's 518 refusals stayed
++            # invisible for a month on this very bot.
++            _record_skip_attribution(row_id, symbol, direction, 'book_blocked',
++                                     matrix_result=matrix_result,
++                                     confluence_score=adj_score,
++                                     pre_trade_walls=pre_trade_walls,
++                                     ai_reason=_book_verdict['reason'])
++            # The card names the wall, its percentile, its distance and WHICH
++            # CLAUSE fired. The two clauses are different claims; a combined flag
++            # would hide which one is doing the work.
++            _bg_w = (f"wall x{_bf['opp_mult']:.1f} @ {_bf['opp_price']:.1f} "
++                     f"(p{_bf['opp_pctl']:.0f} this side, {_bf['opp_dist_pct']:.4f}% away)"
++                     if _bf.get('opp_mult') is not None and _bf.get('opp_pctl') is not None
++                     else "no rankable opposing wall")
++            send_tg(
++                f"\U0001F4D5 <b>BOOK REFUSED ENTRY</b> (clause {_book_verdict['clause']})\n"
++                f"\U0001F48E {symbol}  \U0001F3AF {direction}\n"
++                f"<i>{_book_verdict['reason']}</i>\n"
++                f"{_bg_w} | lean {(_bf.get('lean') if _bf.get('lean') is not None else float('nan')):.4f} "
++                f"| supporting {_bf.get('n_supporting')}\n"
++                f"{dxy_tag(_macro_ctx)}\n"
++                f"<i>discipline rule, not a measured edge — see config BOOK_GATE_*</i>\n"
++                f"<code>{combo}</code>"
++            )
++            return jsonify({"status":    "book_blocked",
++                            "direction": direction,
++                            "clause":    _book_verdict['clause'],
++                            "reason":    _book_verdict['reason'],
++                            "combo":     combo}), 200
++
+     snapshot = _sm_snap  # Bug-1 fix: reuse the atomic capture from the slot write
+     advice = claude_advisor.consult_for_entry(
+         symbol, snapshot, weight_used, news_summary=claude_news_summary,
+--- a/titan-bot/skip_attribution.py
++++ b/titan-bot/skip_attribution.py
+@@ -92,10 +92,15 @@
+ # The tuple is only a scope FILTER — `on_skip` still has to be CALLED at the
+ # refusal site. The EMA gate nearly shipped with the tuple updated and no caller.
+ # Every status below was traced to its refusal point and proven by execution.
++# 🔴 'book_blocked' added 2026-09-07 WITH the gate, not after it. The FLAT
++# floor's 518 refusals were invisible for a month because its status was
++# never registered here; the EMA gate nearly shipped with this tuple updated
++# and no caller. BOTH halves are done in the same edit and the caller is
++# proven by AST walk, not by grep — see the 2026-09-07 report §2f.
+ TRACKED_STATUSES = ('ai_skipped', 'below_threshold', 'htf_blocked',
+                     'ema_envelope_blocked',
+                     'risk_halt', 'virt_cap_blocked', 'claude_unavailable',
+-                    'failed')
++                    'failed', 'book_blocked')
+ 
+ # Drift sample offsets from the skip (label -> seconds). Same horizons as PEO.
+ DRIFT_SLOTS = [('15m', 900), ('1h', 3600), ('4h', 14400),
+--- a/titan-bot/book_gate.py
++++ b/titan-bot/book_gate.py
+@@ -0,0 +1,245 @@
++"""Order-book entry gate for Titan — TRADING DISCIPLINE, NOT A MEASURED EDGE.
++
++🔴 READ THIS BEFORE CHANGING ANYTHING HERE.
++
++WHAT THIS IS. Two rules a discretionary trader would follow without being asked:
++  A  do not buy into a wall     — refuse when the nearest OPPOSING wall is both
++                                  unusually large FOR THIS SIDE and very close;
++  B  do not enter where there   — refuse when the book leans against the entry
++     is nothing to enter into     harder than it ever normally does.
++
++🔴 WHAT THIS IS NOT, AND THE SENTENCE NO FUTURE SESSION MAY DELETE.
++    THIS GATE IS NOT A MEASURED EDGE AND MUST NEVER BE DESCRIBED AS ONE.
++    The 2026-09-07 design pass established that this gate would NOT have refused
++    vpos 102 or vpos 103 — the two stop-outs that prompted it. It is being built
++    because a bot that buys into a wall is doing something a trader would not do,
++    not because the data promises money. That is DISCIPLINE, not a measured edge.
++    If a later pass measures it and finds no edge, that is the EXPECTED result and
++    is NOT grounds to remove it. Grounds to remove it are: it fires too often, it
++    fires asymmetrically by side, or it refuses trades a trader would take.
++
++WHY IN CODE AND NOT IN THE PROMPT. Titan's prompt already carries a "HARD RULE —
++opposing walls" instruction and the advisor overrode it in the open: on vpos 102
++it read an ASK-heavy book — the book leaning AGAINST a LONG — and wrote
++"imbalance ask-heavy favors entry", a straight inversion; on vpos 103 it named the
++opposing wall's 91st percentile, called it "genuine", wrote "proceed with caution"
++and entered. The prompt's own text calls p90+ the thick region. A rule that must
++hold every time cannot live in a text generator.
++
++🔴 THE RULER, AND WHY IT IS NOT SOL'S. `_NEAR_MULT_BREAKS` below is cut from
++Titan's OWN nearest-opposing wall multiples, on EACH SIDE SEPARATELY. Mercury-SOL's
++table is the wrong ruler for BTC and is not merely mis-scaled — it is inert:
++replayed over Titan's own gate population, every Titan wall reads MEDIAN p5 on
++SOL's scale, the SHORT side never exceeds p18, and clause A refuses 0.00 % of
++SHORTs while SOL's 0.20 % distance cut covers 91.5 % of Titan's LONG books instead
++of the intended 25 %. Substituting SOL's constants gives 15.96 % LONG / 0.00 %
++SHORT — a side ban wearing a percentile's name, which is exactly how the EMA
++envelope gate died on 2026-08-07 and why SOL's own floor was re-cut on 2026-08-14.
++
++🔴 THE POPULATION. The breaks, the distance cuts and the lean floors are all cut
++over the rows that REACH THIS GATE — the 199 rows carrying `advisor_book_json`
++(94 LONG / 105 SHORT, 2026-08-03 → 2026-09-07), i.e. the survivors of the HTF
++cascade, the EMA envelope gate, the score bar, the filter list and the risk gate.
++NOT over all book snapshots. Cutting p2 on the 79,745-row `orderbook_density`
++collector table instead gives LONG 0.3506 / SHORT 0.3933, which replays to 0.00 %
++LONG and 3.81 % SHORT on the population the gate actually judges: same quantity,
++wrong population, and it is the category error SOL's 2026-08-14 re-cut records.
++Anyone re-cutting this: cut over rows that reached the gate, never over all books.
++
++Record: reports/2026-09-07-1145-titan-the-book-gate-designed-and-one-clause-refused-a-winner.md
++"""
++
++import logging
++
++log = logging.getLogger(__name__)
++
++# Percentile breakpoints of the NEAREST OPPOSING wall's `mult`, PER SIDE.
++# Cut from the 199-row gate population named above (94 LONG / 105 SHORT).
++# Re-cut only from that same quantity (nearest opposing wall, one side, rows that
++# reached the gate) — never from all rendered walls and never from the collector.
++#
++# 🔴 NOTE HOW DIFFERENT THE TWO SIDES ARE, AND WHY ONE TABLE COULD NOT SERVE BOTH:
++# p90 is x14.84 on a LONG and x6.82 on a SHORT. Titan's wall bucket is 5.0 USD on
++# an ~80,000 USD instrument; opposing ASK walls stack far larger than opposing BID
++# walls. A single nominal multiple would be "top decile" on one side and
++# "unreachable" on the other.
++_NEAR_MULT_BREAKS = {
++    'LONG':  ((5, 4.10), (10, 4.23), (15, 4.30), (20, 4.40), (25, 4.50),
++              (30, 4.60), (35, 4.85), (40, 5.00), (45, 5.20), (50, 5.30),
++              (55, 5.61), (60, 5.96), (65, 7.53), (70, 7.81), (75, 8.32),
++              (80, 8.54), (85, 9.14), (90, 14.84), (95, 24.97)),
++    'SHORT': ((5, 4.20), (10, 4.30), (15, 4.50), (20, 4.50), (25, 4.60),
++              (30, 4.72), (35, 4.80), (40, 4.90), (45, 5.10), (50, 5.20),
++              (55, 5.22), (60, 5.30), (65, 5.40), (70, 5.58), (75, 5.80),
++              (80, 6.00), (85, 6.14), (90, 6.82), (95, 7.54)),
++}
++
++
++def side_pctl(mult, direction):
++    """Percentile of `mult` among NEAREST-OPPOSING walls on `direction`'s side.
++
++    Returns None when not rankable. 🔴 None means NOT RANKABLE and is never to be
++    read as 'ordinary' — the caller must not refuse on it. Same discipline as
++    main._rank_walls: a number we cannot justify is worse than no number.
++    """
++    if not isinstance(mult, (int, float)) or isinstance(mult, bool) or mult != mult:
++        return None
++    brk = _NEAR_MULT_BREAKS.get(direction)
++    if not brk:
++        return None
++    m = float(mult)
++    if m <= brk[0][1]:
++        return float(brk[0][0])
++    if m >= brk[-1][1]:
++        return 99.0
++    for i in range(1, len(brk)):
++        p_lo, v_lo = brk[i - 1]
++        p_hi, v_hi = brk[i]
++        if m < v_hi:
++            if v_hi == v_lo:
++                return float(p_hi)
++            return round(p_lo + (p_hi - p_lo) * (m - v_lo) / (v_hi - v_lo), 1)
++    return 99.0
++
++
++def read_book(walls, direction):
++    """Extract the gate's facts from a liquidity_zones.fetch_pre_trade_walls dict.
++
++    🔴 SHAPE-GUARDED ON PURPOSE. Titan's `trades` table holds TWO different book
++    objects: `advisor_book_json` (the OKX books-full depth-4000 dict this gate and
++    the advisor share) and `orderbook_json` (the BingX depth-20 microstructure
++    capture written AFTER the decision, at a different depth, on a different
++    venue — on vpos 91 it reported a wall the advisor's book did not contain).
++    Reading one as the other silently produces nonsense. This accepts only the
++    OKX-4000 shape, identified by `wall_threshold_mult` + `depth`.
++
++    Returns a facts dict, or None when the book is unusable — the caller must
++    then FAIL OPEN and say so.
++    """
++    if not isinstance(walls, dict):
++        return None
++    if 'wall_threshold_mult' not in walls or 'depth' not in walls:
++        return None                      # not the OKX-4000 shape — refuse to guess
++    mid = walls.get('mid')
++    if (not isinstance(mid, (int, float)) or isinstance(mid, bool)
++            or mid != mid or not mid):
++        return None                      # mid missing, zero, NaN or non-numeric
++    bids = walls.get('walls_bid') or []
++    asks = walls.get('walls_ask') or []
++    if not isinstance(bids, list) or not isinstance(asks, list):
++        return None
++    if direction == 'LONG':
++        opposing, supporting = asks, bids
++        above = lambda p: p > mid
++        below = lambda p: p < mid
++    elif direction == 'SHORT':
++        opposing, supporting = bids, asks
++        above = lambda p: p < mid
++        below = lambda p: p > mid
++    else:
++        return None                      # unknown direction — never guess a side
++    opp = [w for w in opposing
++           if isinstance(w, dict) and isinstance(w.get('price'), (int, float))
++           and above(w['price'])]
++    sup = [w for w in supporting
++           if isinstance(w, dict) and isinstance(w.get('price'), (int, float))
++           and below(w['price'])]
++    near = min(opp, key=lambda w: abs(w['price'] - mid)) if opp else None
++    imb = walls.get('imbalance')
++    # `imbalance` is the BID share. Lean TOWARD the proposed side.
++    lean = (float(imb) if direction == 'LONG' else 1.0 - float(imb)) \
++        if isinstance(imb, (int, float)) and not isinstance(imb, bool) else None
++    return {
++        'mid':          mid,
++        'opp_mult':     (near.get('mult') if near else None),
++        'opp_price':    (near.get('price') if near else None),
++        'opp_pctl':     side_pctl(near.get('mult') if near else None, direction),
++        'opp_dist_pct': (abs(near['price'] - mid) / mid * 100.0 if near else None),
++        'n_opposing':   len(opp),
++        'n_supporting': len(sup),
++        'lean':         lean,
++    }
++
++
++def evaluate(walls, direction):
++    """Decide whether the book refuses this entry.
++
++    Returns {'refuse': bool, 'clause': 'A'|'B'|'AB'|None, 'reason': str, 'facts': {...}}
++
++    🔴 FAILS OPEN, ALWAYS. An unreadable book, a missing wall, an unrankable
++    multiplier, a missing imbalance, a mid of zero, an import that is not there —
++    every one of them ADMITS. A liquidity gate that blocks when it cannot see is a
++    gate that turns an OKX outage into a trading halt, and OKX is a third venue
++    this bot does not trade on. A bug in this file must be able to let a trade
++    through; it must never be able to invent a refusal.
++    """
++    out = {'refuse': False, 'clause': None, 'reason': '', 'facts': {}}
++    try:
++        from config import (BOOK_GATE_ENABLED, BOOK_GATE_CLAUSE_A_ENABLED,
++                            BOOK_GATE_CLAUSE_B_ENABLED, BOOK_GATE_WALL_PCTL,
++                            BOOK_GATE_WALL_DIST_PCT, BOOK_GATE_LEAN_FLOOR,
++                            BOOK_GATE_MIN_SUPPORTING)
++    except Exception as _cfg_err:                      # flags absent/misspelt
++        out['reason'] = f'config unreadable — ADMITTED (gate fails open): {_cfg_err}'
++        return out
++    if not BOOK_GATE_ENABLED:
++        out['reason'] = 'book gate disabled'
++        return out
++    f = read_book(walls, direction)
++    if f is None:
++        out['reason'] = ('book unreadable or not the OKX-4000 shape — ADMITTED '
++                         '(gate fails open)')
++        return out
++    out['facts'] = f
++
++    # ── CLAUSE A — do not trade into a wall ──────────────────────────────────
++    # Both conditions required. A huge wall 0.6 % away is not in the way; a tiny
++    # wall 0.01 % away is not a wall. Only "big AND close" is the thing a trader
++    # would refuse. The distance cut is PER SIDE — see the config comment: on
++    # Titan the two sides' distance distributions differ by 2.2x at the same
++    # quantile, so a single number would itself be the side ban.
++    _dist_thr = (BOOK_GATE_WALL_DIST_PCT.get(direction)
++                 if isinstance(BOOK_GATE_WALL_DIST_PCT, dict) else None)
++    a = (BOOK_GATE_CLAUSE_A_ENABLED
++         and f['opp_pctl'] is not None
++         and f['opp_pctl'] >= BOOK_GATE_WALL_PCTL
++         and f['opp_dist_pct'] is not None
++         and _dist_thr is not None
++         and f['opp_dist_pct'] <= _dist_thr)
++
++    # ── CLAUSE B — do not enter where there is nothing to enter into ─────────
++    # 🔴 SHIPS DISARMED ON TITAN. BOTH of its halves were measured on the gate's
++    # own population and BOTH failed, in the two ways this project already knows:
++    #   · supporting-wall floor at SOL's value of 1 refuses 4.26 % of LONGs and
++    #     0.00 % of SHORTs — an unbounded side ratio;
++    #   · the lean floor at p2 of each side's own distribution fires exactly ONCE
++    #     in 94 LONG rows, and that once is vpos 94 (+0.8650R, trail) — the single
++    #     largest winner of the live batch. A rule whose only historical refusal
++    #     is the best trade in the sample refuses a trade a trader would take.
++    # The numbers stay in config so the clause can be armed the day the population
++    # says otherwise. See BOOK_GATE_CLAUSE_B_ENABLED for the full record.
++    floor = (BOOK_GATE_LEAN_FLOOR.get(direction)
++             if isinstance(BOOK_GATE_LEAN_FLOOR, dict) else None)
++    b = (BOOK_GATE_CLAUSE_B_ENABLED
++         and (f['n_supporting'] < BOOK_GATE_MIN_SUPPORTING
++              or (f['lean'] is not None and floor is not None
++                  and f['lean'] < floor)))
++
++    if not (a or b):
++        out['reason'] = 'book clear'
++        return out
++    out['refuse'] = True
++    out['clause'] = ('AB' if (a and b) else ('A' if a else 'B'))
++    bits = []
++    if a:
++        bits.append(f"opposing wall x{f['opp_mult']:.1f} at p{f['opp_pctl']:.0f} "
++                    f"(this side) only {f['opp_dist_pct']:.4f}% away "
++                    f"(<= {_dist_thr}%)")
++    if b:
++        if f['n_supporting'] < BOOK_GATE_MIN_SUPPORTING:
++            bits.append(f"no supporting depth ({f['n_supporting']} walls)")
++        else:
++            bits.append(f"book leans {f['lean']:.4f} against this side "
++                        f"(< {floor:.4f} = p2 for {direction})")
++    out['reason'] = ' AND '.join(bits)
++    return out

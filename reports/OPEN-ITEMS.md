@@ -10,9 +10,16 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `f5d3542`, re-verified at 2026-08-31 15:35 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `652bb10`, re-verified at 2026-09-07 11:45 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`652bb10` — COMMENT ONLY. `config.py:611` stated the cascade stopping rule as the
+cancelled "20 closed positions or 30 days"; corrected to the rule in force since
+2026-08-31, `ΣR ≤ −5.0R OR 10 closed positions` (`§0.CASCADE-STOP`). Proven
+comment-only by `ast.dump(before) == ast.dump(after)`. No flag, no threshold, no
+restart. The book gate designed in the same session was NOT applied — see
+reports/2026-09-07-1145-*.md §4.**
 
 **`c66a900` — two PROMPT-legibility fixes on the exit prompt (entry ADX15m now rendered;
 percentile rows stamped NOW and declared as four different objects). Legibility of existing
