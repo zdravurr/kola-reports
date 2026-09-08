@@ -27,7 +27,16 @@ still owed to the operator after the cascade experiment resolves.** Applied from
 (0 open rows, 0 BingX positions on both probes). `config.py` and `main.py` have ZERO removed
 lines; the whole diff removes exactly one line, `skip_attribution`'s tuple terminator.
 Review point: **200 gate evaluations, IN ROWS NOT DAYS**, counted from 0 at the 13:29:26 restart.
+🔴 **THE GATE HAS EVALUATED LIVE — 2026-09-08 04:15:15 UTC, rows 30804/30805, BOTH ADMITTED,
+counter 2/200, 0 refusals.** A GENUINE admit, not a dryrun pass-through: opp_pctl 60.8 < 85.0 AND
+opp_dist 0.1015 % > 0.0306 %, so clause A failed BOTH conditions, and clause B would not have fired
+either had it been armed (n_supporting 4, lean 0.5515). Verdict verbatim: `book clear`.
+🔴 **AN ADMITTED ROW PRINTS NO `[BOOK-GATE]` LINE — BY DESIGN, the print sits inside the refuse
+branch. 0 log lines against 2 real evaluations. THE SIGN OF LIFE IS THE SIX COLUMNS, NOT THE LOG.**
+Do not read journal silence as a dead gate. 145 of the 147 signals in the first 14h46m never reach
+it (56 ema_envelope_blocked, 36 htf_blocked, …) — that is the intended sequencing, not a fault.
 Record: reports/2026-09-07-1345-titan-book-gate-applied-live-in-dryrun.md
+        reports/2026-09-08-0420-titan-book-gate-first-live-evaluations-admitted.md
 
 **`652bb10` — COMMENT ONLY. `config.py:611` stated the cascade stopping rule as the
 cancelled "20 closed positions or 30 days"; corrected to the rule in force since
