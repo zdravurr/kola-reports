@@ -10,9 +10,21 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `6fa5d45`, re-verified at 2026-09-09 14:55 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `16b851d`, re-verified at 2026-09-09 20:52 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`16b851d` — 🔴 ON DISK, NOT LOADED. ONE EXIT CONSULTATION IN FLIGHT PER POSITION.** The running
+worker (PID 705634, up since 14:52:36 UTC) still executes `6fa5d45`; `16b851d` changes `main.py` only
+and loads at the NEXT restart from flat. `config.py` is byte-identical to `6fa5d45` — every value in the
+state table below is unchanged and still read from the loaded bytecode. What it does: a second exit
+consultation for a position already being consulted is REFUSED at once (no model call, no row, no
+close) instead of being paid for twice — the 08:30:19/08:30:24 double on vpos 104. See `§0.CONSULT-LOCK`.
+🔴 **THE BOOK GATE IS ORDERED ARMED (`BOOK_GATE_DRYRUN` → False, clause A only) AND IS NOT YET ARMED:**
+the operator's condition is a restart FROM FLAT, and at 20:39 UTC both BingX probes showed the live SHORT
+vpos 105 (0.0019 @ 78 263.2, stop 79 295.1 resting). The window opens when vpos 105 closes. Counter
+**10/200** (8 LONG / 2 SHORT, 0 refusals) continues; the pre-registration stands. See `§0.BOOK-GATE-ARMING`.
+Record: `reports/2026-09-09-2100-titan-advisor-rule-written-consult-lock-on-disk-arming-held.md`
 
 **`6fa5d45` — 🔴🔴 THE CASCADE PORT IS REVERTED. `§0.CASCADE-STOP` FIRED ON THE COUNT ARM (10 CLOSES)
 AND THE OPERATOR ORDERED THE REVERT 2026-09-09.** Three value changes, zero deletions, applied from
@@ -63,6 +75,135 @@ facts only — no new guidance, no threshold. `_CLOSE_SYSTEM_RICH` byte-identica
 **`9c40a4f` — third and last of the same class: the trend rows now OVERLAP. Entry gains
 15m/5m (82/84 populated, NULL prints `not recorded`); 1d/4h/1h are marked ENTRY-ONLY because
 the sample table has no such column at all (313/313). `_CLOSE_SYSTEM_RICH` byte-identical.**
+
+## 🔴🔴 §0.EXIT-ADVISOR-RULE — THE STOPPING RULE FOR THE LIVE EXIT ADVISOR, STATED IN MONEY. Written 2026-09-09 20:55 UTC.
+
+🔴 **Until this entry existed the rule lived only in the operator's head** (adopted 2026-08-30 with the
+five-facts prompt, `§0.EXITFACTS`) and no report or canon entry carried it — the 2026-09-09 15:00 report
+searched and found nothing. Its first formulation, "5 consecutive advisor pre-arm closes", was also badly
+designed: any trail or stop between two advisor closes breaks the run, which is exactly what happened
+(trail on vpos 100, stops on 102 and 103). **This entry replaces it. It is stated in money, not in sequence.**
+
+**THE POPULATION.** Every LIVE close with `close_reason = 'ai_exit'` from **vpos 101 onward** — vpos 101
+(2026-09-01) is the first close under the 1 200-char reason cap and the four rendered facts of 2026-08-30.
+Nothing older belongs here (see the OLD POPULATION below).
+
+**THE MEASURE.** For each such close: the advisor's realised R (`net_pnl / initial_risk_usdt`, as
+everywhere in this canon) **minus the counterfactual R of having HELD the position to the trail-or-stop
+exit**, replayed on BingX `BTC/USDT:USDT` 1m candles in `bardir` order (rising bar → low first, falling bar
+→ high first) with `virtual_trader`'s own rules: the ORIGINAL stop; arming at +1R (1R = |entry −
+`original_sl_price`|) moves the stop to breakeven = entry × (1 ± (2 × 0.0005 + 0.001)); after arming the
+trail trigger is `water_mark × (1 ∓ trail_pct/100)` and only ever tightens, `water_mark` starting from the
+row's value at the advisor's close; net = gross − 0.0005 × size × (entry + exit). This is the exact method
+of the 15:00 report §3c. A counterfactual that has not yet hit its stop or its trail is **UNRESOLVED** and
+counts for nothing until it does.
+
+🔴 **THE STOPPING RULE. At 10 such closes: if Σ(advisor R − counterfactual R) is NEGATIVE, flip
+`EXIT_ADVISOR_DRYRUN` to True.** If it is positive (or zero), the advisor stays live and the next review
+is at **20**, same rule. Report the state after EVERY `ai_exit` close.
+
+**CURRENT STATE — 2 of 10, cumulative +1.5237R / +$2.00 IN THE ADVISOR'S FAVOUR (2026-09-09 20:50 UTC):**
+
+| # | vpos | side | closed | advisor R (net $) | counterfactual exit | counterfactual R (net $) | Δ R | Δ $ |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 101 | SHORT | 09-01 18:00 | +0.2956 (+0.57) | **trail** 77 124.0 at 09-01 19:00 — armed 18:39 (low 76 574.3 ≤ +1R 76 641.6), water_mark 76 372.5 at 18:45, trail 0.984 % | +0.4509 (+0.87) | **−0.1553** | −0.30 |
+| 2 | 104 | LONG | 09-09 08:30 | +0.5757 (+0.79) | **sl** 78 350.1 at 09-09 15:11 (low 78 272.9); +1R 79 874.7 never printed — post-close high 79 737.7 at 08:36 | −1.1033 (−1.51) | **+1.6790** | +2.30 |
+| | | | | | | **Σ** | **+1.5237** | **+2.00** |
+
+vpos 104's counterfactual was OPEN at 14:54 UTC in the 15:00 report (−0.219R mark-to-market); it
+**RESOLVED at 15:11 UTC on the original stop** — resolved, not carried. vpos 101's counterfactual was never
+computed before this entry; computed 2026-09-09 20:47 UTC on 5 000 1m candles from 18:00. Both replays:
+`scratchpad/cf101.py`, `cf104.py` (method as above; the numbers are reproducible from the DB row + BingX).
+
+**THE OLD POPULATION — FOR CONTRAST ONLY, NEVER POOLED:** vpos 87–98, ten `ai_exit` closes under the
+two-sentence prompt, **Σ net −$5.848, ΣR −2.6048** (87 −0.82, 88 −0.53, 89 +2.30, 90 −0.61, 91 −0.64,
+92 −1.31, 93 −0.15, 96 −1.34, 97 −2.29, 98 −0.47). Same mechanism, different instrument (prompt, cap,
+facts): the −$5.85 says nothing about the population above and the population above says nothing about it.
+
+🔴 **TWO DEFECTS IN THE ADVISOR'S REASONING ON vpos 104 — RECORDED AS FACTS, NOT AS FIXES.** In the
+closing verdict (trades 31113, 08:30:19, `close` 0.72):
+1. **"1H confirmation has expired via TTL (360min since entry, now 222min old)"** — the prompt stated the
+   1H signal was set **12.8 h before entry** (≈16.5 h old at the close); **222 min is the POSITION's age**,
+   not the signal's. A fabricated/transposed number.
+2. **"opposing wall collapsed to 16th pct"** — the prompt gave the 16th percentile as a NOW value with no
+   entry-time value beside it and said in so many words that **NONE of these is a change over time**. An
+   inference of change from a value the prompt explicitly marked as not-a-change.
+(Minor, same verdict: `vol_15m` 2.52 → 0.39 attributed to the 5m — numbers right, timeframe wrong.)
+**These are the same CLASS as the four prompt-legibility defects fixed 2026-08-31 (`§0.PROMPT-PAIRING`) —
+but this time the PROMPT WAS CORRECT and the model still misread it.** The second verdict on the same
+position (31115, 08:30:23) made neither error. Nothing was changed for this; the rule above is what judges
+the advisor, in money.
+
+## 🔴 §0.BOOK-GATE-ARMING — ORDERED 2026-09-09, **NOT YET DONE: the flat window was closed.**
+
+**The order (operator, 2026-09-09):** `BOOK_GATE_DRYRUN` True → **False**, clause A only,
+`BOOK_GATE_CLAUSE_B_ENABLED` stays False. Reasoning of record: the standing order since 2026-08-10 is that
+the book takes part in the entry decision MECHANICALLY, and dryrun is not participation; the blocker
+("after the cascade resolves") is gone since `6fa5d45`. **Condition of the order: restart FROM FLAT.**
+
+**Why it is not done:** at 2026-09-09 20:39 UTC both BingX probes (`fetch_positions` + raw
+`swapV2 UserPositions`, `unified+raw`, error list empty) showed **SHORT 0.0019 @ 78 263.2 = vpos 105**
+(opened 19:45:28 UTC, stop 79 295.1 resting as order 2097773401682325504), DB `status='open'` = 1.
+Per the order: position open → say so and stop. **`config.py` was NOT touched** — a flag flipped on disk
+under a running worker would make this table lie about runtime, the exact class `openitems_guard` exists for.
+
+**THE NEXT SESSION, when vpos 105 has closed:** (a) `.bak` of `config.py`, flip the ONE line, AST-verify
+that only `BOOK_GATE_DRYRUN` changed and that `SL_ATR_MULT` 2.25 · `TRAIL_MULT_ATR` 1.6875 · the EMA envelope
+· `LONG_PARTIAL_ENABLED` False · `CONFLUENCE_SCORE_THRESHOLD` 3.0 · `EXIT_ADVISOR_DRYRUN` False · the three
+reverted cascade values · both prompts (`claude_advisor.py` sha256) · size 30 × 5 are untouched;
+(b) confirm FLAT on both probes with an empty error list, 0 open / 0 exit_pending / 0 breakeven_jobs;
+(c) `systemctl restart titan.service`, read the values out of `__pycache__/config.cpython-312.pyc`, quote
+the `[ORDER-MODE]` and `[RECONCILE-XDB]` boot lines, `openitems_guard` EXIT=0; **`16b851d` loads in the
+same restart**; (d) 🔴 **the 200-row review counter CONTINUES — it is not reset by arming.** Counter at
+this writing **10/200 (8 LONG / 2 SHORT), 0 refusals**, from 0 at the 2026-09-07 13:29:26 restart.
+**Pre-registration unchanged: LONG 4.26 % / SHORT 3.81 % refusals, ratio 1.12×; alarm above 5 % on either
+side or ratio above 2×.** 🔴 **Record the arming restart's timestamp HERE as the boundary between dryrun
+rows and armed rows** — rows before it were admitted by construction, rows after it can be refused.
+
+## 🔴 §0.CONSULT-LOCK — `16b851d` **ON DISK, NOT LOADED** (2026-09-09 20:50 UTC)
+
+**The defect (15:00 report §3f):** two 15m webhooks four seconds apart (`Bullish I-BOS` 08:30:10,
+`Bullish S-CHOCH` 08:30:16) on two gthread threads each called the exit advisor for the SAME open position
+vpos 104 — **two paid model calls (trades 31113 / 31115) and two `CLOSING at market` (08:30:19, 08:30:24)**;
+the second was harmless only because the adapter found no position (`VIRTUAL CLOSE ABORTED … row left
+OPEN for reconciliation`). The consultation path had no per-position in-flight lock.
+
+**How often in the record:** paired consultations within 10 s on ONE open vpos — **exactly ONE** (31113 /
+31115, 4.0 s apart), in **173** consult rows since 2026-07-26 22:06; the count is the same at a 60 s
+window. Journal (retained from 2026-09-07 02:20): 2 `CLOSING at market`, both vpos 104. **Wasted: one model
+call and one close attempt** — so far.
+
+**The fix, confined to the consultation entry point** (`main.py`, AST: 155 of 156 top-level nodes
+byte-identical; ADDED `import threading`, `_exit_consult_inflight`, `_exit_consult_inflight_guard`,
+`_exit_consult_lock_for`; CHANGED `consult_exit_advisor`; REMOVED nothing): one `threading.Lock` per vpos
+id, taken with `blocking=False`, released in `finally`. A second consult while one is in flight returns
+`{'decide': 'refused_inflight', 'close': False, …}` at once with a printed reason
+(`[EXIT-ADVISOR-REFUSED] vpos=… trigger=…`) — no model call, no `trades` row, no verdict, no close;
+`_advisor_says_close` is False for it. Same shape as `virtual_trader._entry_lock` (`f30e074`, 2026-06-04),
+but per position and non-blocking. Side effect to know: a refused HOURLY consult still stamps
+`exit_advisor_last_ts` (the caller does that unconditionally), so that hour's review is the webhook verdict.
+
+**Proven by execution before commit** (real text of the four nodes executed with a 3 s model stub):
+refusal returned in **0.08 ms** with the model called once; the OTHER position (vpos 105) consulted
+normally while 104's lock was held; a poll tick carrying the hourly consult AND the stop check completed in
+**0.07 ms** with the lock held by another thread and **the stop fired**; the lock was released after the
+in-flight consult finished, and after a model exception; a row without an id is consulted without a lock.
+Backup `main.py.bak_consultlock_20260909T204800Z`. **Loads at the next restart from flat, with the arming.**
+
+## 📋 §0.RECORDED-NOT-ACTED — two observations of 2026-09-09, no change made
+
+**(a) The false `[VPOS-FILL] 🚨 … MANUAL ACTION REQUIRED` at 08:30:20.771 UTC.** The advisor's own market
+close was sent at 08:30:19.4; the fill poller ran at 08:30:20.8, saw the position GONE and the stop
+unfilled, and alarmed; `_do_close` wrote the row at 08:30:22.1 (`VIRTUAL CLOSE vpos=104 … reason=ai_exit`).
+Nothing needed a hand. Class: **alarm on a state that resolved itself** — the template for a fix is
+Mercury-SOL's evidence-based resolver of 2026-08-08 (`reports/2026-08-08-1752-sol-naked-alerts-resolved-on-evidence-be-decided-reason-is-narration.md`:
+a predicate per alarm stage that requires a positive venue reading, never resolves on age, fails closed).
+**Not built in this pass. Recorded only.**
+
+**(b) `NeedDaemonReload=yes` on `titan.service`.** Not Titan's: the unit and its drop-in are unchanged
+(May / July); what changed is `/etc/systemd/system` itself at **13:38:37 UTC** — `snap-ffmpeg\x2d2404-156.mount`
+was added (a snapd refresh of the ffmpeg snap). A `daemon-reload` is harmless but was not run: nothing of
+Titan's is stale. **Recorded only.**
 
 ## ✅ §0.PROMPT-PAIRING — **CLASS CLOSED 2026-08-31. FOUR INSTANCES, ALL FIXED. SWEEP COMPLETE.**
 
