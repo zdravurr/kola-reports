@@ -23,7 +23,7 @@ inert names (main.py imports them). Population vpos 95..104: **n=10, ΣR −3.65
 −0.366R per trade** against the frozen baseline **n=57, ΣR −0.2702, −0.0047R per trade, 42.1 %**.
 Book gate untouched: `BOOK_GATE_DRYRUN = True`, `BOOK_GATE_CLAUSE_B_ENABLED = False`, counter
 **8/200** continues. 🔴 **THE BLOCKER ON ARMING THE BOOK GATE IS GONE — the decision is the operator's.**
-Record: `reports/2026-09-09-1500-titan-cascade-reverted-at-ten-closes-and-vpos-104-was-pre-arm.md`
+Record: `reports/2026-09-09-1500-titan-cascade-reverted-at-ten-closes-and-vpos-104-was-pre-ar.md`
 
 **`3b075fd` — 🔴 THE BOOK GATE IS APPLIED AND LIVE, IN DRYRUN. IT REFUSES NOTHING.**
 `BOOK_GATE_ENABLED = True`, **`BOOK_GATE_DRYRUN = True`**, `BOOK_GATE_CLAUSE_A_ENABLED = True`,
@@ -248,7 +248,7 @@ counter 8/200 (8 LONG / 0 SHORT), 0 refusals.
 The decision belongs to the operator; the blocker no longer exists.** (Counter-fact still on
 record: the gate sample is 8 LONG / 0 SHORT — the SHORT threshold has not met a single live row.)
 
-Record: `reports/2026-09-09-1500-titan-cascade-reverted-at-ten-closes-and-vpos-104-was-pre-arm.md`
+Record: `reports/2026-09-09-1500-titan-cascade-reverted-at-ten-closes-and-vpos-104-was-pre-ar.md`
 
 *(historical, superseded)* Snapshot verified present and readable 2026-08-30:
 `config.py.bak_solport_20260821T193618Z` (61 129 bytes). Pre-port values it carries:
