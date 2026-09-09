@@ -10,20 +10,9 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `6fa5d45`, re-verified at 2026-09-09 14:55 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `3b075fd`, re-verified at 2026-09-07 13:35 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
-
-**`6fa5d45` — 🔴🔴 THE CASCADE PORT IS REVERTED. `§0.CASCADE-STOP` FIRED ON THE COUNT ARM (10 CLOSES)
-AND THE OPERATOR ORDERED THE REVERT 2026-09-09.** Three value changes, zero deletions, applied from
-FLAT and LOADED by the 14:52:36 UTC restart, read back out of the bytecode the worker imported:
-`HTF_NEUTRAL_REQUIRE_15M_DRYRUN = False` (ENFORCE again), `CONFLUENCE_FLAT_THRESHOLD = 5.0`,
-`HTF_REARM_FROM_15M_ENABLED = False`. `HTF_REARM_COOLDOWN_MINUTES` / `HTF_REARM_DRYRUN` kept as
-inert names (main.py imports them). Population vpos 95..104: **n=10, ΣR −3.6595, Σ$ −6.53, 3W/7L,
-−0.366R per trade** against the frozen baseline **n=57, ΣR −0.2702, −0.0047R per trade, 42.1 %**.
-Book gate untouched: `BOOK_GATE_DRYRUN = True`, `BOOK_GATE_CLAUSE_B_ENABLED = False`, counter
-**8/200** continues. 🔴 **THE BLOCKER ON ARMING THE BOOK GATE IS GONE — the decision is the operator's.**
-Record: `reports/2026-09-09-1500-titan-cascade-reverted-at-ten-closes-and-vpos-104-was-pre-arm.md`
+*(previous header values `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
 
 **`3b075fd` — 🔴 THE BOOK GATE IS APPLIED AND LIVE, IN DRYRUN. IT REFUSES NOTHING.**
 `BOOK_GATE_ENABLED = True`, **`BOOK_GATE_DRYRUN = True`**, `BOOK_GATE_CLAUSE_A_ENABLED = True`,
@@ -169,8 +158,8 @@ measurement made before the fact — it is not a measurement.
 vpos 104 closed **+0.5757R** (`ai_exit`, 79 112.4 → 79 637.7, net +0.79 USDT). Population vpos 95..104:
 **10 closes, ΣR −3.6595, 3 wins / 7 losses, −0.366R per trade** against a baseline of −0.0047R.
 The **count** condition is met (10 of 10). The **ΣR** condition is NOT (−3.6595, still 1.3405R of
-room to −5.0R). Titan is FLAT: 0 open, 0 exit_pending, 0 breakeven_jobs. ~~**The revert is the
-operator's to order; nothing has been reverted.**~~ **ORDERED AND EXECUTED 2026-09-09 14:52 UTC — see the REVERTED block below.**
+room to −5.0R). Titan is FLAT: 0 open, 0 exit_pending, 0 breakeven_jobs. **The revert is the
+operator's to order; nothing has been reverted.**
 
 ### 🔴🔴 THE REVERT PROCEDURE AS PREVIOUSLY WRITTEN WOULD NOT BOOT. CORRECTED 2026-09-09.
 
@@ -201,54 +190,6 @@ instead") — the rule was applied to one flag and not to the other three. Fix t
 `HTF_REARM_FROM_15M_ENABLED` is the FIRST condition of the guard at `main.py:4393`, so `False`
 neutralises the whole block and leaves `HTF_REARM_COOLDOWN_MINUTES` / `HTF_REARM_DRYRUN` inert but
 still importable. Keep both names. Restart from flat, then `openitems_guard`.
-
-### ✅ **REVERTED 2026-09-09 14:52:36 UTC — `6fa5d45`. THE EXPERIMENT IS CLOSED.**
-
-**Which arm fired:** the COUNT arm — vpos 104 closed 2026-09-09 08:30:21 UTC, the tenth close of the
-population vpos 95..104. The ΣR arm did NOT fire (final ΣR −3.6595, 1.34R short of −5.0R).
-
-| vpos | side | opened | closed | entry → exit | R | net $ | reason |
-|---|---|---|---|---|---|---|---|
-| 95 | LONG | 08-23 16:35 | 08-24 02:00 | 77409.9 → 76924.2 | −0.5326 | −1.08 | external |
-| 96 | LONG | 08-24 12:45 | 08-24 13:45 | 78747.4 → 78121.0 | −0.5456 | −1.34 | ai_exit |
-| 97 | LONG | 08-24 15:30 | 08-24 17:30 | 79764.4 → 78570.1 | −0.7964 | −2.29 | ai_exit |
-| 98 | LONG | 08-27 08:15 | 08-27 13:16 | 79530.0 → 79348.4 | −0.2601 | −0.47 | ai_exit |
-| 99 | LONG | 08-30 06:55 | 08-30 08:45 | 78232.4 → 78031.1 | −0.5318 | −0.55 | external |
-| 100 | LONG | 08-30 13:05 | 08-30 17:18 | 78694.4 → 78979.9 | +0.4172 | +0.39 | trail |
-| 101 | SHORT | 09-01 16:15 | 09-01 18:00 | 77661.0 → 77282.2 | +0.2956 | +0.57 | ai_exit |
-| 102 | LONG | 09-06 23:45 | 09-07 01:16 | 80393.3 → 79825.5 | −1.1581 | −1.18 | sl |
-| 103 | LONG | 09-07 02:40 | 09-07 03:37 | 80340.0 → 79653.7 | −1.1235 | −1.38 | sl |
-| 104 | LONG | 09-09 04:45 | 09-09 08:30 | 79112.4 → 79637.7 | +0.5757 | +0.79 | ai_exit |
-
-| | n | ΣR | per trade | win | Σ$ |
-|---|---|---|---|---|---|
-| baseline (frozen, window B, recounted from the DB 2026-09-09: identical) | 57 | −0.2702 | −0.0047R | 42.1 % | — |
-| experiment, all ten | 10 | **−3.6595** | **−0.366R** | 30.0 % | **−6.53** |
-| LONG leg (contaminated by partial-off 2026-08-27 17:14) | 9 | −3.9551 | −0.439R | 22.2 % | −7.10 |
-| — of which clean (opened before partial-off) | 4 | −2.1347 | −0.534R | 0 % | −5.18 |
-| — of which post-partial-off | 5 | −1.8205 | −0.364R | 40 % | −1.92 |
-| SHORT leg (clean) | 1 | +0.2956 | +0.296R | 100 % | +0.57 |
-
-**Verdict: the port made the book WORSE — 78× worse per trade in R, −$6.53 in dollars over
-19 days, in the direction the replay predicted (−13.01R vs −2.70R). n=10 proves nothing
-statistically; the prior was against the change and the live result agrees with the prior.
-The SHORT leg produced ONE close in 19 days and cannot be judged.**
-
-**Reverted values (three lines, `config.py`, AST-proven the only changed Constants; 124 names
-before and after, none added, none removed):** `HTF_NEUTRAL_REQUIRE_15M_DRYRUN` True→**False**,
-`CONFLUENCE_FLAT_THRESHOLD` 3.0→**5.0**, `HTF_REARM_FROM_15M_ENABLED` True→**False**.
-Backup `config.py.bak_cascaderevert_20260909T145141Z`. Restart 14:52:36 UTC from FLAT (0 open,
-0 exit_pending, 0 breakeven_jobs, both BingX probes `[]` with an empty error list); boot line
-`[RECONCILE-XDB] ✅ exchange and DB agree: 0 exchange position(s), 0 open row(s)`; values read
-from `__pycache__/config.cpython-312.pyc` (header mtime/size VALID). `openitems_guard` EXIT=0.
-The book gate survived untouched: `BOOK_GATE_DRYRUN = True`, `BOOK_GATE_CLAUSE_B_ENABLED = False`,
-counter 8/200 (8 LONG / 0 SHORT), 0 refusals.
-
-🔴 **UNBLOCKED: arming the book gate was deferred until the cascade resolved. It has resolved.
-The decision belongs to the operator; the blocker no longer exists.** (Counter-fact still on
-record: the gate sample is 8 LONG / 0 SHORT — the SHORT threshold has not met a single live row.)
-
-Record: `reports/2026-09-09-1500-titan-cascade-reverted-at-ten-closes-and-vpos-104-was-pre-arm.md`
 
 *(historical, superseded)* Snapshot verified present and readable 2026-08-30:
 `config.py.bak_solport_20260821T193618Z` (61 129 bytes). Pre-port values it carries:
@@ -5065,9 +5006,9 @@ disagreement with runtime. Cite an OLD value anywhere outside the fence; inside 
 | `WALL_TRAIL_LIVE_ENABLED` | False |
 | `MAX_POSITIONS_PER_SIDE` | 1 |
 | 🔴 `CONFLUENCE_SCORE_THRESHOLD` | **3.0** — UNCHANGED by the 2026-08-21 SOL port. SOL runs 2.0; porting it is a FOURTH change and was deliberately refused |
-| `CONFLUENCE_FLAT_THRESHOLD` | **5.0** since `6fa5d45` 2026-09-09 (CASCADE-STOP revert; was 3.0 from `a7e7b46` 2026-08-21 to 2026-09-09). Deleting it is a NameError: `main.py:505` imports it by name |
-| `HTF_NEUTRAL_REQUIRE_15M_DRYRUN` | **False** since `6fa5d45` 2026-09-09 (CASCADE-STOP revert; was True from `a7e7b46` 2026-08-21 to 2026-09-09). The rule ENFORCES again — the 2026-06-29..2026-08-21 behaviour |
-| `HTF_REARM_FROM_15M_ENABLED` / `HTF_REARM_COOLDOWN_MINUTES` / `HTF_REARM_DRYRUN` | **False / 60 / False** since `6fa5d45` 2026-09-09 (CASCADE-STOP revert; was True / 60 / False from `a7e7b46`). The names STAY — `main.py:546` imports all three; `False` on the master switch neutralises the block |
+| 🔴 `CONFLUENCE_FLAT_THRESHOLD` | **3.0** since `a7e7b46` 2026-08-21 (was 5.0). Set EQUAL to the TREND bar so an empty 1H tier no longer raises it — SOL has no such constant at all. Deleting it is a NameError: `main.py:505` imports it by name and five sites read it |
+| `HTF_NEUTRAL_REQUIRE_15M_DRYRUN` | **True** since `a7e7b46` 2026-08-21 (was False). The rule LOGS and no longer judges — SOL parity. It was Titan's largest refusal cause: 1,514 of 4,086 in 30 days |
+| `HTF_REARM_FROM_15M_ENABLED` / `HTF_REARM_COOLDOWN_MINUTES` / `HTF_REARM_DRYRUN` | **True / 60 / False** — NEW in `a7e7b46`, ported from Mercury-SOL Lever B. Before this the word `rearm` appeared zero times in Titan's tree |
 | `POST_ENTRY_RECHECK_ENABLED` / `RECHECK_TIERS_SEC` | True / `[10, 60, 300]` |
 | 🔴 `SL_ATR_MULT` / `TRAIL_MULT_ATR` | **2.25 / 1.6875 (= 0.75R)** — changed `be53e63` 2026-08-04 17:01:29; this row read `2.5 / 2.5` until 2026-08-05 22:00, which would have made any reader compute 1R **wrong** |
 | 🔴 `AI_ADVISOR_HIDE_1H` / `HTF_TOLERATE_NEUTRAL` | **False** / True — HIDE_1H set False in `de1d0f2` 2026-08-05: it never hid anything (the direction is inside the LuxAlgo signal NAME on 100% of withheld lines) |
