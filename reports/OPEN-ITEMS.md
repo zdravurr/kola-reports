@@ -153,11 +153,49 @@ measurement made before the fact — it is not a measurement.
 
 **Report the trigger state after EVERY close from here.** Do not revert without the trigger.
 
-**THE REVERT IS THREE LINES + A RESTART FROM FLAT.** Snapshot verified present and readable
-2026-08-30: `config.py.bak_solport_20260821T193618Z` (61 129 bytes). Pre-port values it carries:
+### 🔴🔴 THE TRIGGER FIRED 2026-09-09 08:30:21 UTC — **10 CLOSED POSITIONS.** ΣR did NOT fire.
+
+vpos 104 closed **+0.5757R** (`ai_exit`, 79 112.4 → 79 637.7, net +0.79 USDT). Population vpos 95..104:
+**10 closes, ΣR −3.6595, 3 wins / 7 losses, −0.366R per trade** against a baseline of −0.0047R.
+The **count** condition is met (10 of 10). The **ΣR** condition is NOT (−3.6595, still 1.3405R of
+room to −5.0R). Titan is FLAT: 0 open, 0 exit_pending, 0 breakeven_jobs. **The revert is the
+operator's to order; nothing has been reverted.**
+
+### 🔴🔴 THE REVERT PROCEDURE AS PREVIOUSLY WRITTEN WOULD NOT BOOT. CORRECTED 2026-09-09.
+
+Two boot-breaking traps, both verified by reading the tree, and both would fire at the exact moment
+the operator executes the revert under time pressure:
+
+**TRAP 1 — DO NOT `cp` THE .bak OVER `config.py`.** `config.py.bak_solport_20260821T193618Z`
+(61 129 bytes, 113 names) predates the book gate. Restoring it wholesale **deletes all eight
+`BOOK_GATE_*` names**, and `main.py` does `from config import BOOK_GATE_DRYRUN` at module level ⇒
+**ImportError at boot, Titan does not start.** The .bak is a REFERENCE FOR TWO VALUES, never a file
+to restore. (Full list it would delete: the 8 `BOOK_GATE_*` plus the 3 `HTF_REARM_*`.)
+
+**TRAP 2 — DO NOT DELETE THE THREE `HTF_REARM_*` NAMES.** The previous text said reverting means
+*removing* them. `main.py:546` imports all three **by name** in a `from config import (...)` block
+and reads them at 4393/4398/4399 ⇒ **deletion is an ImportError at boot.** This is the SAME
+reasoning the port itself already wrote down for `CONFLUENCE_FLAT_THRESHOLD` ("Titan cannot simply
+delete it: main.py imports it BY NAME … deletion is a NameError at boot. Its EFFECT is neutralised
+instead") — the rule was applied to one flag and not to the other three. Fix the class, not the name.
+
+**THE CORRECT REVERT — THREE VALUE CHANGES, NO DELETIONS, THEN RESTART FROM FLAT:**
+
+| line | from | to |
+|---|---|---|
+| `HTF_NEUTRAL_REQUIRE_15M_DRYRUN` | `True` | **`False`** |
+| `CONFLUENCE_FLAT_THRESHOLD` | `3.0` | **`5.0`** |
+| `HTF_REARM_FROM_15M_ENABLED` | `True` | **`False`** |
+
+`HTF_REARM_FROM_15M_ENABLED` is the FIRST condition of the guard at `main.py:4393`, so `False`
+neutralises the whole block and leaves `HTF_REARM_COOLDOWN_MINUTES` / `HTF_REARM_DRYRUN` inert but
+still importable. Keep both names. Restart from flat, then `openitems_guard`.
+
+*(historical, superseded)* Snapshot verified present and readable 2026-08-30:
+`config.py.bak_solport_20260821T193618Z` (61 129 bytes). Pre-port values it carries:
 `HTF_NEUTRAL_REQUIRE_15M_DRYRUN = False`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
-⚠️ `HTF_REARM_COOLDOWN_MINUTES` and `HTF_REARM_DRYRUN` **do not exist in that .bak** — they were
-ADDED by the port. Reverting means **removing** them, not restoring a prior value.
+⚠️ `HTF_REARM_COOLDOWN_MINUTES` and `HTF_REARM_DRYRUN` do not exist in that .bak — they were
+ADDED by the port. ~~Reverting means removing them~~ **— WRONG, see TRAP 2 above.**
 
 ## ✅ §0.REASONCAP — **CLOSED 2026-08-31 14:03 UTC. `7ba8241` IS NOW LOADED.**
 
