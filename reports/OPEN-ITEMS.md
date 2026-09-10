@@ -10,20 +10,29 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `16b851d`, re-verified at 2026-09-09 20:52 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `cd0f175`, re-verified at 2026-09-10 14:40 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
 
-**`16b851d` — 🔴 ON DISK, NOT LOADED. ONE EXIT CONSULTATION IN FLIGHT PER POSITION.** The running
-worker (PID 705634, up since 14:52:36 UTC) still executes `6fa5d45`; `16b851d` changes `main.py` only
-and loads at the NEXT restart from flat. `config.py` is byte-identical to `6fa5d45` — every value in the
-state table below is unchanged and still read from the loaded bytecode. What it does: a second exit
-consultation for a position already being consulted is REFUSED at once (no model call, no row, no
-close) instead of being paid for twice — the 08:30:19/08:30:24 double on vpos 104. See `§0.CONSULT-LOCK`.
-🔴 **THE BOOK GATE IS ORDERED ARMED (`BOOK_GATE_DRYRUN` → False, clause A only) AND IS NOT YET ARMED:**
-the operator's condition is a restart FROM FLAT, and at 20:39 UTC both BingX probes showed the live SHORT
-vpos 105 (0.0019 @ 78 263.2, stop 79 295.1 resting). The window opens when vpos 105 closes. Counter
-**10/200** (8 LONG / 2 SHORT, 0 refusals) continues; the pre-registration stands. See `§0.BOOK-GATE-ARMING`.
+**`cd0f175` — 🔴🔴 THE BOOK GATE IS ARMED. `BOOK_GATE_DRYRUN` True → False, clause A only, applied FROM FLAT
+and LOADED by the 2026-09-10 14:36:20 UTC restart** (master PID 961100, worker 961118 at 14:36:31; read back out of
+the loaded `config.cpython-312.pyc`: `BOOK_GATE_DRYRUN = False`, `BOOK_GATE_CLAUSE_A_ENABLED = True`,
+`BOOK_GATE_CLAUSE_B_ENABLED = False`). ONE AST node of `config.py` changed (127 → 127 nodes, 1 differs); every
+other value in the state table is unchanged and re-read from the same bytecode. Flat at 14:36:16.97 UTC on both BingX
+probes (empty, error list empty), 0 open orders, DB 0 / 0 / 0; boot journal 0 errors, `RECONCILE-XDB ✅ 0 / 0`.
+🔴 **THE BOUNDARY IS 2026-09-10 14:36:20 UTC. Gate rows before it are DRYRUN observations — 15/200 (13 LONG / 2 SHORT),
+0 refusals, all admitted by construction; rows after it are LIVE and can be refused. Never pool them. The 200-row
+counter is NOT reset.** (The 21:00 report said 10/200; five LONG rows landed 2026-09-10 13:45–13:55 UTC, all admitted
+by the gate and then `ai_skipped` by the entry advisor.) Same commit: `openitems_guard` now watches the three
+`BOOK_GATE_*` flags — it had returned EXIT=0 against a header that still said `True`. See `§0.BOOK-GATE-ARMING`.
+Record: `reports/2026-09-10-1450-titan-book-gate-armed-from-flat-consult-lock-loaded-vpos-105.md`
+
+**`16b851d` — ✅ LOADED 2026-09-10 14:36:20 UTC, in the same restart. ONE EXIT CONSULTATION IN FLIGHT PER
+POSITION.** `main.cpython-312.pyc` (header = `main.py` mtime/size of 2026-09-09 20:46:01, `_exit_consult_lock_for`
+in its names) was read by the new process at 14:36:20.56 UTC (kernel atime, reset to 20:00 beforehand so only the
+boot could stamp it). A second exit consultation for a position already being consulted is REFUSED at once (no model
+call, no row, no close) — the 08:30:19/08:30:24 double on vpos 104. vpos 105 (closed 23:46:01 UTC, before the
+lock loaded) had NO double: one consult row (31259), one `CLOSING at market`. See `§0.CONSULT-LOCK`.
 Record: `reports/2026-09-09-2100-titan-advisor-rule-written-consult-lock-on-disk-arming-held.md`
 
 **`6fa5d45` — 🔴🔴 THE CASCADE PORT IS REVERTED. `§0.CASCADE-STOP` FIRED ON THE COUNT ARM (10 CLOSES)
@@ -37,6 +46,7 @@ Book gate untouched: `BOOK_GATE_DRYRUN = True`, `BOOK_GATE_CLAUSE_B_ENABLED = Fa
 **8/200** continues. 🔴 **THE BLOCKER ON ARMING THE BOOK GATE IS GONE — the decision is the operator's.**
 Record: `reports/2026-09-09-1500-titan-cascade-reverted-at-ten-closes-and-vpos-104-was-pre-ar.md`
 
+*(superseded 2026-09-10 14:36:20 UTC by `cd0f175` — the gate is ARMED; this paragraph is the record of the dryrun period)*
 **`3b075fd` — 🔴 THE BOOK GATE IS APPLIED AND LIVE, IN DRYRUN. IT REFUSES NOTHING.**
 `BOOK_GATE_ENABLED = True`, **`BOOK_GATE_DRYRUN = True`**, `BOOK_GATE_CLAUSE_A_ENABLED = True`,
 `BOOK_GATE_CLAUSE_B_ENABLED = False` — read out of the bytecode the running worker loaded.
@@ -102,18 +112,41 @@ counts for nothing until it does.
 `EXIT_ADVISOR_DRYRUN` to True.** If it is positive (or zero), the advisor stays live and the next review
 is at **20**, same rule. Report the state after EVERY `ai_exit` close.
 
-**CURRENT STATE — 2 of 10, cumulative +1.5237R / +$2.00 IN THE ADVISOR'S FAVOUR (2026-09-09 20:50 UTC):**
+**CURRENT STATE — 3 observed, 2 RESOLVED of 10; Σ over the resolved two +1.5237R / +$2.00 IN THE ADVISOR'S FAVOUR; vpos 105 PENDING (2026-09-10 14:40 UTC):**
 
 | # | vpos | side | closed | advisor R (net $) | counterfactual exit | counterfactual R (net $) | Δ R | Δ $ |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 101 | SHORT | 09-01 18:00 | +0.2956 (+0.57) | **trail** 77 124.0 at 09-01 19:00 — armed 18:39 (low 76 574.3 ≤ +1R 76 641.6), water_mark 76 372.5 at 18:45, trail 0.984 % | +0.4509 (+0.87) | **−0.1553** | −0.30 |
 | 2 | 104 | LONG | 09-09 08:30 | +0.5757 (+0.79) | **sl** 78 350.1 at 09-09 15:11 (low 78 272.9); +1R 79 874.7 never printed — post-close high 79 737.7 at 08:36 | −1.1033 (−1.51) | **+1.6790** | +2.30 |
-| | | | | | | **Σ** | **+1.5237** | **+2.00** |
+| 3 | 105 | SHORT | 09-09 23:46 | −0.0136 (−0.03) | **UNRESOLVED at 09-10 14:40 UTC** — original stop 79 295.1 never printed (post-close high 78 522.7 at 05:58); +1R 77 231.3 printed 09-10 **12:38 → ARMED**, stop to breakeven 78 106.7; water_mark 76 636.0 at 12:47; trail trigger now **77 393.9** (0.989 %), last 77 227 | pending — mark-to-market +0.9287; would be +0.7669 (+1.50) if the trail fired at 77 393.9 now | **pending** | pending |
+| | | | | | | **Σ resolved (2)** | **+1.5237** | **+2.00** |
 
 vpos 104's counterfactual was OPEN at 14:54 UTC in the 15:00 report (−0.219R mark-to-market); it
 **RESOLVED at 15:11 UTC on the original stop** — resolved, not carried. vpos 101's counterfactual was never
 computed before this entry; computed 2026-09-09 20:47 UTC on 5 000 1m candles from 18:00. Both replays:
 `scratchpad/cf101.py`, `cf104.py` (method as above; the numbers are reproducible from the DB row + BingX).
+
+vpos 105's counterfactual (`scratchpad/cf105.py`, 895 1m candles from 23:46) is OPEN and **counts for nothing until
+it resolves**: it can still end on the trail (≈ +0.77R, advisor Δ ≈ −0.78R) or, only if price first drops and the
+trail tightens, higher. It can no longer end on the original stop: the stop moved to breakeven 78 106.7 at 12:38.
+**Whoever reports next: replay from 23:46 with the row's values (fill 78 263.2, stop 79 295.1, size 0.0019, risk
+1.9607, trail 0.989 %, water_mark 77 750.2) and enter the resolved Δ here. Then it is 3 of 10.**
+
+🔴 **THE vpos 105 CLOSING VERDICT CHECKED AGAINST ITS PROMPT (trades 31259, 23:46:01 UTC, `close` 0.72, hourly).**
+Every number the verdict quotes that the prompt contains is right: 5m BULL / 15m NEUTRAL, ADX15m 39.8 vs 20.9,
+supporting wall ×7.6 → ×6.8, imbalance 0.57 → 0.51, giveback 0.43R (+0.50R → +0.07R), closing cost 0.076R = 114 % of
+the unrealised, arm at +1R not reached. The vpos 104 defect #2 was NOT repeated: it wrote *"the hourly regime is
+entry-only, but the only paired TF data (15m/5m) shows deterioration"* — it honoured the UNPAIRED warning and inferred
+no change from any NOW-only percentile. Two smaller misreadings, same class as vpos 104 #1: **"the 41m recent
+structure shows bullish I-CHOCH+ and bullish OB"** — those two events are stamped **36m** ago; 41m is the stamp of a
+BEARISH liquidity grab (a transposed timestamp), and the two NEWEST events (6m ago) were bearish, WITH the short, and
+went unmentioned; and **"bid support eroding"** — for a SHORT the supporting wall is on the ASK side; the direction of
+the inference (thinning is against the short) is right, the label is wrong. It did not cite fact (b), the −1.00R floor
+on holding, and it used fact (c) ("won't arm, needs +1R") as a reason to close rather than as what closing gives up —
+a reading, not an error. The trail was NOT armed at the close (water_mark 77 750.2 never reached 77 231.3), so the
+prompt rendered the unarmed form of (b)/(c): *"NOT ARMED — it arms only at +1R … would arm at 77231.3 … a further
+0.50R"*. (The operator's card put the arm at 77 480.6; the row and the prompt say 77 231.3 = entry − 1 031.9.)
+No second consultation: one consult row in 19:45–23:59 at 23:46:01, one `CLOSING at market` in the journal since entry.
 
 **THE OLD POPULATION — FOR CONTRAST ONLY, NEVER POOLED:** vpos 87–98, ten `ai_exit` closes under the
 two-sentence prompt, **Σ net −$5.848, ΣR −2.6048** (87 −0.82, 88 −0.53, 89 +2.30, 90 −0.61, 91 −0.64,
@@ -134,7 +167,28 @@ but this time the PROMPT WAS CORRECT and the model still misread it.** The secon
 position (31115, 08:30:23) made neither error. Nothing was changed for this; the rule above is what judges
 the advisor, in money.
 
-## 🔴 §0.BOOK-GATE-ARMING — ORDERED 2026-09-09, **NOT YET DONE: the flat window was closed.**
+## ✅ §0.BOOK-GATE-ARMING — ORDERED 2026-09-09, **DONE 2026-09-10 14:36:20 UTC (`cd0f175`). THAT TIMESTAMP IS THE DRYRUN/ARMED BOUNDARY.**
+
+🔴 **DONE, as recorded below, from flat.** 14:34:54 UTC `.bak` (`config.py.bak_bookgatearm_20260910T143454Z`) and the
+one-line flip; AST: 127 → 127 top-level nodes, exactly one differs (`BOOK_GATE_DRYRUN = True → False`), and
+`SL_ATR_MULT` 2.25 · `TRAIL_MULT_ATR` 1.6875 · `EMA_ENVELOPE_*` · `LONG_PARTIAL_ENABLED` False ·
+`CONFLUENCE_SCORE_THRESHOLD` 3.0 · `CONFLUENCE_FLAT_THRESHOLD` 5.0 · `EXIT_ADVISOR_DRYRUN` False ·
+`HTF_NEUTRAL_REQUIRE_15M_DRYRUN` False · `HTF_REARM_FROM_15M_ENABLED` False · `BOOK_GATE_CLAUSE_A/B` True/False ·
+30 × 5 compared equal node-for-node; `claude_advisor.py` sha256 `ca14e959…c6c6` before and after. 14:36:16.97 UTC flat:
+DB 0 open / 0 `exit_pending` / 0 `breakeven_jobs`, probe 1 `{}` `[]`, probe 2 `{}` `[]`, open orders `{}` `[]`.
+14:36:17.21 `systemctl restart titan.service`; master 961100 at 14:36:20, worker 961118 at 14:36:31. Boot lines:
+`[ORDER-MODE] 🔴 LIVE ORDERS — REAL MONEY: orders ARE sent to BingX · LIVE_TRADING_ENABLED = True ·
+ORDER_ADAPTER_LIVE = True · sizing: margin $30 x 5 = $150 notional per entry` and
+`[RECONCILE-XDB] ✅ exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`; 0 errors.
+Values read out of `__pycache__/config.cpython-312.pyc` (header = source): `BOOK_GATE_DRYRUN = False`, clause A True,
+clause B False, everything else as in the table. `16b851d` loaded in the same restart (`§0.CONSULT-LOCK`).
+🔴 **BOUNDARY 2026-09-10 14:36:20 UTC. Counter at that instant: 15/200 (13 LONG / 2 SHORT), 0 refusals — NOT 10/200:
+five LONG rows (31453–31457) were evaluated 13:45–13:55 UTC, all admitted, all then `ai_skipped`.** Rows before the
+boundary were admitted by construction; rows after it can be refused. The counter continues; pre-registration
+unchanged (LONG 4.26 % / SHORT 3.81 % refusals, ratio 1.12×; alarm above 5 % on either side or ratio above 2×).
+🔴 **`openitems_guard` was BLIND to this flag:** it returned EXIT=0 with the loaded flag False and the fenced table
+silent on it — `BOOK_GATE_DRYRUN` was not on `WATCHED`. Fixed in `cd0f175` (the three `BOOK_GATE_*` flags added) and
+proven both ways: a copy of this canon with the row saying `True` → EXIT=1 naming `BOOK_GATE_DRYRUN`; this file → EXIT=0.
 
 **The order (operator, 2026-09-09):** `BOOK_GATE_DRYRUN` True → **False**, clause A only,
 `BOOK_GATE_CLAUSE_B_ENABLED` stays False. Reasoning of record: the standing order since 2026-08-10 is that
@@ -160,7 +214,7 @@ this writing **10/200 (8 LONG / 2 SHORT), 0 refusals**, from 0 at the 2026-09-07
 side or ratio above 2×.** 🔴 **Record the arming restart's timestamp HERE as the boundary between dryrun
 rows and armed rows** — rows before it were admitted by construction, rows after it can be refused.
 
-## 🔴 §0.CONSULT-LOCK — `16b851d` **ON DISK, NOT LOADED** (2026-09-09 20:50 UTC)
+## ✅ §0.CONSULT-LOCK — `16b851d` **LOADED 2026-09-10 14:36:20 UTC**, the restart that armed the gate (written 2026-09-09 20:50 UTC)
 
 **The defect (15:00 report §3f):** two 15m webhooks four seconds apart (`Bullish I-BOS` 08:30:10,
 `Bullish S-CHOCH` 08:30:16) on two gthread threads each called the exit advisor for the SAME open position
@@ -5205,6 +5259,9 @@ disagreement with runtime. Cite an OLD value anywhere outside the fence; inside 
 | `EXIT_ADVISOR_HOURLY` | True |
 | `WALL_TRAIL_LIVE_ENABLED` | False |
 | `MAX_POSITIONS_PER_SIDE` | 1 |
+| 🔴 `BOOK_GATE_ENABLED` | **True** since `3b075fd` 2026-09-07 |
+| 🔴 `BOOK_GATE_DRYRUN` | **False** — ARMED by `cd0f175`, restart from flat 2026-09-10 14:36:20 UTC. Was True from `3b075fd` 2026-09-07 13:29:26 until that instant (15 dryrun evaluations, all admitted by construction). 🔴 BOUNDARY — never pool dryrun rows with armed rows |
+| `BOOK_GATE_CLAUSE_A_ENABLED` / `BOOK_GATE_CLAUSE_B_ENABLED` | True / False — clause A refuses an entry into an opposing wall at or above the 85th percentile within the side's distance; clause B stays disarmed on measurement |
 | 🔴 `CONFLUENCE_SCORE_THRESHOLD` | **3.0** — UNCHANGED by the 2026-08-21 SOL port. SOL runs 2.0; porting it is a FOURTH change and was deliberately refused |
 | `CONFLUENCE_FLAT_THRESHOLD` | **5.0** since `6fa5d45` 2026-09-09 (CASCADE-STOP revert; was 3.0 from `a7e7b46` 2026-08-21 to 2026-09-09). Deleting it is a NameError: `main.py:505` imports it by name |
 | `HTF_NEUTRAL_REQUIRE_15M_DRYRUN` | **False** since `6fa5d45` 2026-09-09 (CASCADE-STOP revert; was True from `a7e7b46` 2026-08-21 to 2026-09-09). The rule ENFORCES again — the 2026-06-29..2026-08-21 behaviour |
