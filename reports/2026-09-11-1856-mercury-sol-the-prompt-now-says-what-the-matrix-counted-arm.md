@@ -14,7 +14,7 @@ Guard pre-flight: `titan-bot/tools/openitems_guard.py` **EXIT = 0** (14 watched 
 
 ## WHAT YOU MAY WANT TO DECIDE
 
-1. **Nothing is waiting on you to keep running.** The prompt line has been live since 18:26:59; 🔴 NO live consultation had arrived when this report was published — the line is proven loaded (bytecode) but NOT yet seen on a live prompt. Rollback is two `.bak_matrixline_20260911` files plus a restart from flat.
+1. **Nothing is waiting on you to keep running.** The prompt line has been live since 18:26:59; ✅ LIVE-PROVEN at 19:40:06 UTC: the first consultation after the restart (trades.id 25817, open_long, decision skip) carried the line, and it agreed with that row's own stored matrix on 3 of 3 tiers (published 18:56, before it arrived; ADDENDUM at the end). Rollback is two `.bak_matrixline_20260911` files plus a restart from flat.
 2. 🔶 **I changed `main.py` by ONE keyword argument, which the brief did not foresee.**
    - You said the data is in `matrix_breakdown_json`. It holds points and flags only: no signal names and no ages.
    - Names and ages exist only in `matrix_result['active_signals']` at the call site. So the call now passes `matrix_result=matrix_result`.
@@ -32,7 +32,7 @@ Guard pre-flight: `titan-bot/tools/openitems_guard.py` **EXIT = 0** (14 watched 
 - **It is not an outcome lever, and nothing here says it is.** Those 11 live entries made ΣR **+7.733**; the 5 without a zeroed tier made **−0.979**. That is n = 11 against n = 5, so it is **not ranked**. §2 was applied because the prompt promised something the numbers did not support, not because it pays.
 - **§2 is applied.** One fact line now sits directly under the AS-COUNTED tally. It says, per tier, what the score gate did with that tier's category; when a category was zeroed, it names each side's signal with its age against the window.
   - There is no instruction, no threshold, and no change to anything computed.
-  - AST-proven, system prompts byte-identical, contract 7/7, restarted from flat, loaded bytecode verified. 🔴 NO live consultation had arrived when this report was published — the line is proven loaded (bytecode) but NOT yet seen on a live prompt.
+  - AST-proven, system prompts byte-identical, contract 7/7, restarted from flat, loaded bytecode verified. ✅ LIVE-PROVEN at 19:40:06 UTC: the first consultation after the restart (trades.id 25817, open_long, decision skip) carried the line, and it agreed with that row's own stored matrix on 3 of 3 tiers (published 18:56, before it arrived; ADDENDUM at the end).
 - **Defect B happened once.** Across **38** closed positions, reconstructed from Bybit 1m candles, the venue printed through the arm while the poller's water mark never reached it **exactly once: vpos 44**. Had it armed at that print, the lock would have closed the trade at breakeven: **−1.110R → +0.000R, +$2.1307**.
   - Paper: **0**. Near misses where no candle crossed: 3 (vpos 18, 19, 42).
   - The poller ticks every **12.5 s** (median; p95 13.7 s, max 243.5 s), not the configured 10 s.
@@ -364,6 +364,7 @@ Between the restart (18:26:59) and publication the bot wrote these rows, and NON
 A read-only waiter is still running (4 h, trades.db ?mode=ro): it takes the first post-restart consultation,
 checks that its stored ai_user_prompt carries the line, and checks every tier claim on it against that
 row's own stored matrix_breakdown_json. Its result will be APPENDED to THIS file, at this same URL.
+→ DONE 19:40:06 — see ADDENDUM at the end: trades.id 25817 carried the line, 3 of 3 tier claims agree with its stored matrix.
 What IS proven now: the running worker imported the patched builder (bytecode header == patched source,
 §2e), and the builder renders the line on vpos 44's own stored inputs (§2d) and in the contract (§2c).
 ```
@@ -855,4 +856,32 @@ near misses (lock never armed, best candle within 0.10R of the arm but did not c
   vpos 18 paper candle short of arm by 0.147 = 0.087R; poller short by 0.105R
   vpos 19 paper candle short of arm by 0.009 = 0.006R; poller short by 0.027R
   vpos 42 LIVE candle short of arm by 0.012 = 0.005R; poller short by 0.024R
+```
+
+---
+
+## ADDENDUM (19:4x UTC) — the live proof, same file, same URL
+
+The read-only waiter armed at 18:27 found the first entry consultation after the 18:26:59 restart. There were no consultations before it: 18:30-19:30 rows were exit_unarmed_noop, htf_blocked ×4, context_recorded, and 19:40:05 entry_gate_refused.
+- **The stored `ai_user_prompt` carries the line, exactly once, directly under the AS-COUNTED tally.**
+- **Each tier claim was checked against that row's own stored `matrix_breakdown_json`: 3 of 3 AGREE.**
+- It also shows a mismatch class other than vpos 44's. The 15m slot said `HyperWave Signal Down -> SHORT = OPPOSES`, while MOMENTUM held **no signal inside its 90-min window**. The tally counted that tier as an opposing vote; the line now states that the matrix had nothing there (the EMPTY class, §1e).
+- mercury-sol MainPID 1341949, NRestarts 0, unchanged since the restart.
+
+```
+FIRST POST-RESTART CONSULT: trades.id 25817 2026-09-11 19:40:06 status=ai_skipped open_long decision=skip reused=False
+matrix line present: True
+  Score matrix, as the score gate counted these tiers (it counts every signal still inside its category window, not only the latest per slot): 1H → TREND LONG +2.25, counted | 15m → MOMENTUM 0, no signal inside its 90-min window | 5m trigger → EXECUTION LONG +2.50, counted
+  1H         TREND     line says ZEROED=False  stored breakdown intra_conflict=False  net=LONG contrib=2.25  -> AGREE
+  15m        MOMENTUM  line says ZEROED=False  stored breakdown intra_conflict=False  net=NEUTRAL contrib=0.0  -> AGREE
+  5m trigger EXECUTION line says ZEROED=False  stored breakdown intra_conflict=False  net=LONG contrib=2.5  -> AGREE
+--- full stored prompt tier block ---
+Tier agreement vs LONG (computed for this consultation):
+  1H: Smart Trail Switch Bullish -> LONG = AGREES
+  15m: HyperWave Signal Down -> SHORT = OPPOSES
+  5m trigger: Bullish OB Created -> LONG = AGREES
+  Of the 3 tier(s) shown — AS COUNTED (stale tiers vote in full): 2 agree, 1 oppose, 0 neutral, 0 absent.
+  Score matrix, as the score gate counted these tiers (it counts every signal still inside its category window, not only the latest per slot): 1H → TREND LONG +2.25, counted | 15m → MOMENTUM 0, no signal inside its 90-min window | 5m trigger → EXECUTION LONG +2.50, counted
+The cascade gate, the score gate and the risk gate have already passed. That is a separate hard gate on the 1H/15m/5m slots — it is NOT a statement that the tiers listed above agree with each other.
+Decide whether the bot should execute this entry now.
 ```
