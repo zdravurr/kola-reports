@@ -10,9 +10,24 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `7b17e11`, re-verified at 2026-09-12 14:30 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `f16c271`, re-verified at 2026-09-12 15:00 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`f16c271` — ✅ THE UNARMED-TRAIL FACT LEADS WITH THE OPTION. APPLIED FROM FLAT AND LOADED by the
+2026-09-12 14:58:32 UTC restart** (MainPID 1563560 → 1572470; boot line `RECONCILE-XDB ✅ exchange and DB agree
+for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`; `claude_advisor.cpython-312.pyc` regenerated
+**14:58:34**, header == source, sha `e88d7fe634973e90`). `claude_advisor.py` **alone**, ONE branch —
+`consult_for_close_rich._protection_block`'s unarmed `else` — sha256 `ca14e959a5c6104c` → `e88d7fe634973e90`,
++47 / −11 lines, **0 top-level nodes added or removed, 0 other functions changed, 0 of 7 module-level constants
+changed**. The sentence used to open with `NOT ARMED … the stop is the only protection`; **3 of the 4 positions
+closed under that wording used its absence as a reason TO CLOSE**, including vpos 105, the ledger's largest loss.
+It now opens with the arm PRICE, states the gap in R and in price, and says what arming would do. **No value is
+recomputed; no threshold, no lean.** Contract `tests/test_exit_prompt_arm_leads_with_the_option.py` 9 of 9 green
+as root and as botuser; all four SYSTEM prompts sha256 unchanged. `openitems_guard` EXIT=0 before and after.
+🔴 **This is a COHORT BOUNDARY: `§0.EXIT-ADVISOR-RULE` is unaffected at 4 observed / 3 RESOLVED of 10,
+Σ +0.7433R, but verdicts either side of 14:58:32 UTC are not one population.** See `§0.ARMLEAD`.
+Record: `reports/2026-09-12-1520-titan-the-unarmed-trail-fact-now-leads-with-the-option.md`
 
 **`7b17e11` — ✅ THE ZEROED TIER NOW NAMES EACH SIDE AND AGES IT AGAINST THE WINDOW. APPLIED FROM FLAT AND
 LOADED by the 2026-09-12 14:18:13 UTC restart** (master PID 961100 → 1563560; boot line `RECONCILE-XDB ✅
@@ -384,6 +399,105 @@ introduces nor repairs it; contract case [0] asserts **parity, not repair**. Bot
 
 Record: `reports/2026-09-12-0020-titan-defect-a-was-already-fixed-on-titan-what-is-missing-is-the-names-and-the-ages.md`
 (the measurement and the held patch) and `reports/2026-09-12-1430-titan-matrix-tier-names-applied-and-the-exit-advisor-ledger-resolved.md` (the apply).
+
+## ✅ §0.ARMLEAD — THE UNARMED-TRAIL FACT NOW **LEADS WITH THE OPTION**, NOT WITH ITS ABSENCE. **APPLIED 2026-09-12 14:58:32 UTC, FROM FLAT.**
+
+🔴 **A FACT WE WROTE WAS BEING READ AS ITS OWN OPPOSITE.** The sentence opened *"The trailing stop is NOT
+ARMED — it arms only at +1R … so the stop is the only protection"*, and the plain reading of that is *there is
+no protection, so leave*. Its actual meaning is the reverse: closing early gives up the option of arming. Same
+class as the four prompt-legibility defects of `§0.PROMPT-PAIRING` (2026-08-31) — **the prompt says something
+whose plain reading is the opposite of what the numbers mean.** Not an arithmetic error: the
+2026-09-12 14:30 report §2d checked every number vpos 106 quoted against its stored prompt and all were right.
+
+**MEASURED OVER EVERY STORED EXIT CONSULTATION OF THE CURRENT PROMPT FORM** (era C = the 2026-08-30
+`§0.EXITFACTS` wording, `33` consultations, **all LIVE, all unarmed by construction**, 2026-08-30 16:05:43 →
+2026-09-12 09:15:09):
+
+| | count |
+|---|---|
+| consultations | **33** |
+| verdicts that mention the trail | **19** |
+| 🔴 …that use its ABSENCE as a reason **TO CLOSE** | **3 — and all three are CLOSES** |
+| …that read it as something **FORGONE** | **16 — and all sixteen are HOLDS** |
+| verdicts that never mention it | 14 |
+| 🔴 verdicts that quoted the arm **PRICE** | **1 of 33** |
+| verdicts that quoted the gap in R | 13 of 33 |
+
+**The three inversions, verbatim:**
+* `trades 29123` · 2026-09-01 18:00:17 · **vpos 101** — *"Holding exposes the position to deteriorating thesis
+  with no trailing stop yet armed."*
+* `trades 31259` · 2026-09-09 23:46:01 · **vpos 105** — *"…is material but justified: the thesis is no longer
+  valid, **trailing stop won't arm (needs +1R)**, and holding into a reversed regime …"*
+* `trades 31884` · 2026-09-12 09:15:09 · **vpos 106** — *"**Trailing stop not armed; no asymmetric upside
+  protection exists.**"*
+
+🔴 **n = 3 of the 4 positions closed in era C** (the fourth, vpos 104, never mentioned it — its two rows are the
+pre-`§0.CONSULT-LOCK` double consult). The 2026-09-12 14:30 report said *two of four*; the full count found
+**vpos 101 as well**. vpos 105 is the exit-advisor ledger's **largest loss, −0.7805R / −$1.53**.
+
+**THE MIRROR, AND THE WIDER POPULATION — BOTH NEGATIVE, BOTH CHECKED.**
+* **ARMED branch: no inversion, ever.** Four rows in the whole record (`20097`, `25159`, `25165`, `28531`); one
+  is a `claude timeout` with no verdict, one was truncated by the old reason cap without reaching the trail, and
+  the two that discuss it read it correctly (*"trailing stop 0.81R away provides solid risk/reward"*; *"With
+  stop-market resting on exchange and trailing protection armed, downside is contained"*). **When the sentence
+  leads with ARMED, the reading is right. That is the diagnosis.**
+* **SKIP verdicts cannot invert it: the fact is not in their prompt.** Of **3,075** stored entry consultations
+  (2,841 `skip`, 208 `execute`, 26 `unavailable`), the number containing `NOT ARMED`, `would arm`, `trailing
+  stop` or `+1R` is **0**. **The population is NOT larger than the exit ledger.**
+
+**WHAT CHANGED — the order and the wording of one sentence. No value is recomputed and no other fact is touched.**
+```
+BEFORE  The trailing stop is NOT ARMED — it arms only at +1R, which this position has not
+        reached, so the stop is the only protection. It would arm if price reaches 75726.8
+        (+1R). A further 0.94R of favourable movement would arm it; closing now gives that up.
+
+AFTER   The trailing stop ARMS AT 75726.8 (+1R): reaching that price moves the stop to
+        breakeven, and the trail then follows the high-water mark from there. From the current
+        price that is a move of 1604.1 in the position's favour. The peak reached so far came
+        within 0.94R of it. Until 75726.8 prints, the trail does not exist and the stop is the
+        only protection. Closing now ends that possibility.
+```
+The arm price appears **twice** so it is quotable, and the gap is now given in **price** as well as R —
+computed inside the builder from `arm_level` and `price`, both already in the context, so **`main.py` is not
+touched**. **FACTS ONLY**, the 2026-08-05 line held: no threshold, no lean, no *therefore*, no *consider*;
+contract case [6] pins the absence of every such word.
+
+🔴 **A SECOND LEGIBILITY DEFECT IN THE SAME SENTENCE, FIXED BY LABEL ONLY.** `arm_dist_r` is
+`max(0, 1 − mfe_r)` — how far the **PEAK** is from the arm, **not** how far the current price is. On vpos 106
+those were **0.94R and 1.25R**. *"A further 0.94R of favourable movement would arm it"* reads as *from here*
+and **understated the required move by 0.31R**. The value is unchanged; it is now labelled by its true
+reference (*"the peak reached so far came within 0.94R of it"*).
+
+**APPLIED:** `claude_advisor.py` sha256 `ca14e959a5c6104c` → `e88d7fe634973e90` (+47 / −11 lines, **0 top-level
+nodes added or removed**). Backup `claude_advisor.py.bak_armlead_20260912T145700Z` is byte-identical to the file
+it replaced. **AST proof PASS** on the applied file: strip only that `else` branch from both trees and the
+remainder is `ast.dump`-identical — **0 functions differ, 0 of 7 module-level constants differ**. Contract
+`tests/test_exit_prompt_arm_leads_with_the_option.py`: **9 of 9 green as root and as botuser**, pinning the
+armed branch, the unreadable branch, the no-arm-price branch (byte-identical across all 60 input shapes,
+malformed included), the exact new wording, the quotable numbers, every other fact's text, and the sha256 of all
+four SYSTEM prompts. `tests/test_entry_tiers_matrix_names_ages.py` still EXIT=0.
+
+Restarted from a proven-flat book (0/0/0 in the DB; 0 positions **and** 0 orders on BingX on **both** probes
+with an **empty error list**, re-proved immediately before the restart), MainPID 1563560 → 1572470, boot line
+`RECONCILE-XDB ✅ exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`.
+🔴 **LOADED, CONFIRMED FROM BYTECODE:** `claude_advisor.cpython-312.pyc` regenerated **14:58:34**, header ==
+source, source sha `e88d7fe634973e90`. `openitems_guard` EXIT=0 before and after.
+
+🔴 **WHAT THIS CANNOT DO, STATED BEFORE ANYONE CLAIMS IT DID.** It removes an inverted *reading*. **It cannot
+stop a model concluding wrongly from correct facts.** The precedent is on the record: on 2026-08-31 the SOL
+zeroed-tier label was already present on **all nine** live cases and the narration built on the tier anyway.
+Whether the advisor now holds where it used to close is **unknown and unmeasurable until it runs**. **This is
+LEGIBILITY, NOT A MEASURED EDGE**, and no later pass may cite the 3-of-3 / 16-of-16 split as an effect: it is a
+correlation over 19 verdicts and four positions, with the reading and the decision produced by the same call.
+
+🔴 **COHORT BOUNDARY — 2026-09-12 14:58:32 UTC.** `§0.EXIT-ADVISOR-RULE` is **UNAFFECTED** and stays at
+**4 observed / 3 RESOLVED of 10, Σ +0.7433R / +$0.47**. Nothing here resolves, re-scores or re-weights a single
+row. But verdicts written before and after this timestamp saw **different wording of the same fact**, so they
+are **not one population**: the **7 remaining closes** should be read against this boundary, and if the rule
+fires at 10 the split must be stated alongside the sum.
+
+Record: `reports/2026-09-12-1430-titan-matrix-tier-names-applied-and-the-exit-advisor-ledger-resolved.md` (§2d,
+which found the inversion) and `reports/2026-09-12-1520-titan-the-unarmed-trail-fact-now-leads-with-the-option.md`.
 
 ## ✅ §0.PROMPT-PAIRING — **CLASS CLOSED 2026-08-31. FOUR INSTANCES, ALL FIXED. SWEEP COMPLETE.**
 
