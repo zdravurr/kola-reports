@@ -499,6 +499,90 @@ fires at 10 the split must be stated alongside the sum.
 Record: `reports/2026-09-12-1430-titan-matrix-tier-names-applied-and-the-exit-advisor-ledger-resolved.md` (§2d,
 which found the inversion) and `reports/2026-09-12-1520-titan-the-unarmed-trail-fact-now-leads-with-the-option.md`.
 
+## 📋 §0.EXIT-GATES — three "where the advisor may close" gates replayed on the whole record, 2026-09-12. **NOTHING QUALIFIES. RECORDED ONLY — nothing proposed, nothing applied.**
+
+**The question.** `§0.EXIT-ADVISOR-RULE` decides at 10 closes, which is ≈ 5 months away if the question
+is the trigger. So the 2026-09-12 briefs asked a different question: could a rule, readable at decision
+time with no look-ahead, restrict **which** `close` verdicts may act? Each gate only forbids a close.
+A blocked position runs to its trail or stop, on the same stand that reproduces the published rows to
+the digit.
+
+| gate | predicate (reads the float in `ctx`, not the printed 2-dp value) | canon, n=3 resolved | pre-2026-08-30, n=10 resolved (**NOT POOLED**) | of 68 close verdicts |
+|---|---|---|---|---|
+| G1@0.06 | block iff `mfe_r < 0.06` | blocks 0 | {92, 93} +0.0021 R | 5 |
+| G1@0.25 ≡ G1@0.35 | block iff `mfe_r < f` (identical on every close verdict) | blocks 0 | {88, 90, 92, 93, 97} −0.2257 R | 27 |
+| 🔴 **G1@0.50** | block iff `mfe_r < 0.50` | 🔴 **{101, 105} +0.9358 R / +$1.83, 2 of 3, both losses** | {88, 90, 92, 93, 96, 97} +1.4317 R, **destroys wins 90, 93, 97**; drop 96 → −0.2257 R | 40 |
+| G1@0.75 | block iff `mfe_r < 0.75` | {101, 104, 105} −0.7433 R | 8 blocked, +0.1669 R, destroys 5 wins | 46 |
+| **G2** | block iff `upnl_r > 0` and `trail_armed is not True` | {101, 104, 105} **−0.7433 R**: gives back vpos 104 (+1.6791) | blocks 0 | 19 |
+| **G3** | block iff `upnl_r >= 0` | {101, 104, 105} **−0.7433 R** | {89} **−0.7418 R** | 20 (= G2 + `trades 20097`) |
+
+**Verdict.** No gate keeps every win, drops every loss, blocks nothing that was right **and** changes ≥ 4
+closes. **G1@0.50 is the "looks good because it blocks 2 of 3" case: fitted to two trades, best of five
+declared values, sign p = 0.500 (the best two trades can give), and out of population it destroys 3
+wins. Rejected.** G2 and G3 change 3 of 3 canon closes and end at −0.7433 R. **Rejected.** On canon,
+seven variants produce only three distinct blocked sets. Bonferroni over 14 cells (α = 0.003571): **no
+cell reaches even 0.05.** 🔴 **All 14 closes predate the 2026-09-12 14:58:32 boundary: n = 0 under the
+current wording.** vpos 106 still unresolved at 18:19 UTC, and in no sum.
+
+🔴 **CORRECTION: the 18:10 report of the same day is WRONG on G1@0.50.** It printed canon {101}, +0.1553 R,
+because it read vpos 105's MFE as the printed `+0.50R`. **The true value is 0.4971R**, from the row's own
+`water_mark` 77 750.2 (= the value at decision, since the close came 2 s later) **and** from
+`position_excursion_samples` (peak 0.6555 % at 22:09:29, before the 23:46:01 decision). Its "+1.5870 R
+total" and "−0.0705 R leave-one-out" pooled the two populations. **Trust this entry, not that table.**
+Also: **the counterfactual assumes the advisor never speaks again**, but a real gate lifts. G1@0.50 on
+vpos 105 would have allowed a close at 4 later hourly marks, and G2 on vpos 104 at 2 (under water).
+Only vpos 101's counterfactual needs no later verdict.
+
+**`EXIT_ADVISOR_DRYRUN` stays False. The rule stands at 3 RESOLVED of 10.** The operator has both options
+with their numbers: leave it running (≈ 23–25 days), or flip it on the argument that its whole decision
+population is blind. Flipping is an import-time constant (`main.py:543`, `virtual_trader.py:106`), so it
+means a restart in each direction.
+Record: `reports/2026-09-12-1840-titan-exit-gates-rechecked-g1-050-fits-2-of-3-watcher-is-alive.md`
+
+## 🔴 §0.SESSION-PROMISES — A CHECK KEPT BY A SESSION'S BACKGROUND PROCESS IS NOT A MECHANISM. Written 2026-09-12. **+ OPEN: the `signal_tiers` in-process `.pyc` confirmation**
+
+**THE LESSON.** A promise whose keeper is a background process started by a session is not a mechanism.
+It fails two ways, and **the `.pyc` item below has one of each**:
+* **It can die with its session.** The 14:30 session armed `pycwatch.sh` at **14:19:40**. It is not in the
+  process table, and its output file holds only its start line: its `340 × sleep 10` window would have
+  ended about 15:17 and appended `NO IMPORT within window`, and that line never came. **It was killed
+  before its window ended.** The item stayed open while two reports said "a watcher is running".
+* **It can outlive its session.** The 15:20 session armed `stwatch.sh` at **14:59:35**, detached (`Ss`,
+  re-parented to PID 1). **It is ALIVE: PID 1572660, checked with `pgrep` and `/proc` at 18:29.** It
+  expires on its own at about **2026-09-13 07:40 UTC** (`4000 × sleep 15`) and writes its answer into a
+  dead session's `/tmp` scratchpad **that no future session is told to read**.
+* 🔴 **And a process nobody owns gets described by guesswork.** The 17:15 report said "`ps` shows no
+  watcher process", and the 18:10 report and the operator's brief repeated "it is dead". **It was running
+  the whole time.** Same class as the 2026-08-31 `mail_watch "DEAD 64 m"` false verdict: a stale output
+  file means nothing was written, **not** that the writer is dead. And the 18:10 report said this lesson
+  was "RECORDED IN THE CANON" when it had not been written. **Reported as arranged, never arranged.**
+
+**SAME CLASS AS THE BOOK-GATE REVIEW THAT WENT UNCHECKED FOR THREE WEEKS.** A mechanism outlives the
+session that set it up and delivers to someone who will be there: a cron entry that reports, a contract
+test, a guard the next session must run, **a line in this file**. **Where a persistent artefact answers
+the question on demand, write down which artefact and the one command that reads it. Arming a watcher is
+strictly worse:** it adds a way to fail and buys nothing. **Never state that a process is alive or dead
+without `pgrep` / `/proc`.**
+
+### 🔴 OPEN — `signal_tiers` has not been imported since the 2026-09-12 14:18 apply (`7b17e11`)
+
+**What is proven:** the applied source is `4af4fdba57cfaf84…` (mtime 2026-09-12 14:15:53, 23 584 B). The
+cached `.pyc` header says it was compiled from the 2026-08-04 15:06:23, 15 924 B source, so **Python cannot
+load it**, and the first `import signal_tiers` must compile the applied source. **What is NOT proven:** that
+the running worker has done that import. The import is lazy and happens on the first **entry**
+consultation. None has happened since the restart (last one: `trades 31760`, 2026-09-11 22:00:11), because
+every signal since 14:58:32 was stopped at the HTF or EMA-envelope gate first.
+
+**HOW TO CLOSE IT — ANY SESSION, ANY TIME, NO WATCHER:**
+```
+stat -c '%n %y %s' /root/titan-bot/signal_tiers.py /root/titan-bot/__pycache__/signal_tiers.cpython-312.pyc
+```
+**Still OPEN** while the `.pyc` mtime is **2026-08-04 15:07:11** (status at 2026-09-12 18:29 UTC: OPEN).
+**CLOSED** when the `.pyc` mtime is later than the restart **and** its header matches the source. Check with
+`python3 -B -c "import struct,os;h=open('/root/titan-bot/__pycache__/signal_tiers.cpython-312.pyc','rb').read(16);m,s=struct.unpack('<II',h[8:16]);t=os.stat('/root/titan-bot/signal_tiers.py');print(m==int(t.st_mtime) and s==t.st_size)"`
+→ `True`, together with an `entry` consultation row newer than 2026-09-12 14:58:32 in `trades`.
+Record: `reports/2026-09-12-1840-titan-exit-gates-rechecked-g1-050-fits-2-of-3-watcher-is-alive.md` §5
+
 ## ✅ §0.PROMPT-PAIRING — **CLASS CLOSED 2026-08-31. FOUR INSTANCES, ALL FIXED. SWEEP COMPLETE.**
 
 **One defect class, found and closed in a single day:
