@@ -10,9 +10,21 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `cd0f175`, re-verified at 2026-09-10 14:40 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `7b17e11`, re-verified at 2026-09-12 14:30 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`7b17e11` — ✅ THE ZEROED TIER NOW NAMES EACH SIDE AND AGES IT AGAINST THE WINDOW. APPLIED FROM FLAT AND
+LOADED by the 2026-09-12 14:18:13 UTC restart** (master PID 961100 → 1563560; boot line `RECONCILE-XDB ✅
+exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`). `signal_tiers.py` **alone**,
+sha256 `ac32ba1227285576` → `4af4fdba57cfaf84`, +145 / −2 lines, three new top-level helpers. Flat proved before
+the copy AND again before the restart: 0 open `virtual_positions`, 0 `exit_pending`, 0 `breakeven_jobs`, and 0
+positions AND 0 orders on BingX on **both** probes (unified + raw swapV2) with an **empty error list**. AST proof
+re-run on the applied file: PASS. New contract `tests/test_entry_tiers_matrix_names_ages.py`: **8 of 8 green as
+root and as botuser**. The four advisor SYSTEM prompts and `claude_advisor.py` whole-file sha256 unchanged AFTER
+the apply. **Nothing computed changed** — score, gates, slots and the `Agreement:` sentence are all byte-identical
+by contract. `openitems_guard` EXIT=0 before and after. See `§0.MATRIX-TIER-NAMES`.
+Record: `reports/2026-09-12-1430-titan-matrix-tier-names-applied-and-the-exit-advisor-ledger-resolved.md`
 
 **`cd0f175` — 🔴🔴 THE BOOK GATE IS ARMED. `BOOK_GATE_DRYRUN` True → False, clause A only, applied FROM FLAT
 and LOADED by the 2026-09-10 14:36:20 UTC restart** (master PID 961100, worker 961118 at 14:36:31; read back out of
@@ -112,25 +124,40 @@ counts for nothing until it does.
 `EXIT_ADVISOR_DRYRUN` to True.** If it is positive (or zero), the advisor stays live and the next review
 is at **20**, same rule. Report the state after EVERY `ai_exit` close.
 
-**CURRENT STATE — 3 observed, 2 RESOLVED of 10; Σ over the resolved two +1.5237R / +$2.00 IN THE ADVISOR'S FAVOUR; vpos 105 PENDING (2026-09-10 14:40 UTC):**
+**CURRENT STATE — 4 observed, 3 RESOLVED of 10; Σ over the resolved three +0.7433R / +$0.47 IN THE ADVISOR'S FAVOUR; vpos 106 PENDING (2026-09-12 14:23 UTC):**
 
 | # | vpos | side | closed | advisor R (net $) | counterfactual exit | counterfactual R (net $) | Δ R | Δ $ |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 101 | SHORT | 09-01 18:00 | +0.2956 (+0.57) | **trail** 77 124.0 at 09-01 19:00 — armed 18:39 (low 76 574.3 ≤ +1R 76 641.6), water_mark 76 372.5 at 18:45, trail 0.984 % | +0.4509 (+0.87) | **−0.1553** | −0.30 |
-| 2 | 104 | LONG | 09-09 08:30 | +0.5757 (+0.79) | **sl** 78 350.1 at 09-09 15:11 (low 78 272.9); +1R 79 874.7 never printed — post-close high 79 737.7 at 08:36 | −1.1033 (−1.51) | **+1.6790** | +2.30 |
-| 3 | 105 | SHORT | 09-09 23:46 | −0.0136 (−0.03) | **UNRESOLVED at 09-10 14:40 UTC** — original stop 79 295.1 never printed (post-close high 78 522.7 at 05:58); +1R 77 231.3 printed 09-10 **12:38 → ARMED**, stop to breakeven 78 106.7; water_mark 76 636.0 at 12:47; trail trigger now **77 393.9** (0.989 %), last 77 227 | pending — mark-to-market +0.9287; would be +0.7669 (+1.50) if the trail fired at 77 393.9 now | **pending** | pending |
-| | | | | | | **Σ resolved (2)** | **+1.5237** | **+2.00** |
+| 2 | 104 | LONG | 09-09 08:30 | +0.5757 (+0.79) | **sl** 78 350.1 at 09-09 15:11 (low 78 272.9); +1R 79 874.7 never printed — post-close high 79 737.7 at 08:36 | −1.1033 (−1.51) | **+1.6791** | +2.30 |
+| 3 | 105 | SHORT | 09-09 23:46 | −0.0136 (−0.03) | 🔴 **RESOLVED 2026-09-12: trail 77 393.9 at 09-10 14:56 UTC** — armed 09-10 12:38 at +1R 77 231.3, stop to breakeven 78 106.7; water_mark 76 636.0; trail 0.989 % | +0.7669 (+1.50) | **−0.7805** | −1.53 |
+| 4 | 106 | SHORT | 09-12 09:15 | −0.2963 (−0.72) | **UNRESOLVED at 09-12 14:23 UTC** — original stop 78 301.6 never printed (post-close high 77 375.1 at 14:22); +1R arm 75 726.8 **never reached**, water_mark unchanged at 76 936.5, so the trail never armed and the stop is still the original | pending — mark-to-market −0.3354 (−0.82); Δ would be **+0.0391** if it closed at market now | **pending** | pending |
+| | | | | | | **Σ resolved (3)** | **+0.7433** | **+0.47** |
+
+**vpos 105 IS NOW RESOLVED.** Replayed 2026-09-12 on 3 755 1m BingX candles from 23:47, **0 gaps**, `bardir`
+order, the row's own values (fill 78 263.2, stop 79 295.1, size 0.0019, risk 1.9607, trail 0.989 %, water_mark
+77 750.2). It armed at **12:38 on 09-10** — the exact minute this entry predicted — and the trail fired at
+**77 393.9 on 09-10 14:56**, 16 minutes after the 14:40 snapshot above, for **+0.7669R / +$1.5037**, also exactly
+the figure this entry projected. **Δ = −0.7805R / −$1.53: the advisor closed at −0.01R a position that was
+worth +0.77R.** The same stand re-derived rows 1 and 2 from scratch and reproduced their published numbers to
+the digit (101 +0.4509R, 104 −1.1033R), which is what licenses row 3.
 
 vpos 104's counterfactual was OPEN at 14:54 UTC in the 15:00 report (−0.219R mark-to-market); it
 **RESOLVED at 15:11 UTC on the original stop** — resolved, not carried. vpos 101's counterfactual was never
-computed before this entry; computed 2026-09-09 20:47 UTC on 5 000 1m candles from 18:00. Both replays:
-`scratchpad/cf101.py`, `cf104.py` (method as above; the numbers are reproducible from the DB row + BingX).
+computed before this entry; computed 2026-09-09 20:47 UTC on 5 000 1m candles from 18:00.
 
-vpos 105's counterfactual (`scratchpad/cf105.py`, 895 1m candles from 23:46) is OPEN and **counts for nothing until
-it resolves**: it can still end on the trail (≈ +0.77R, advisor Δ ≈ −0.78R) or, only if price first drops and the
-trail tightens, higher. It can no longer end on the original stop: the stop moved to breakeven 78 106.7 at 12:38.
-**Whoever reports next: replay from 23:46 with the row's values (fill 78 263.2, stop 79 295.1, size 0.0019, risk
-1.9607, trail 0.989 %, water_mark 77 750.2) and enter the resolved Δ here. Then it is 3 of 10.**
+🔴 **THE PATTERN AT n=3, STATED AND NOT RANKED.** The sum is positive **only because of vpos 104**. The other
+two resolved closes are **−0.936R together**, and both are SHORTS closed in front of a move that armed the
+trail *after* the advisor had exited (101 armed 39 min later, 105 armed 12.8h later). The one save, 104, is a
+LONG whose counterfactual ran into the ORIGINAL STOP. 2 shorts negative, 1 long positive, and the fourth
+observation (106, unresolved) is another short. **n=3 is not a finding — it is three numbers**, and the rule
+deliberately waits for 10.
+
+🔴 **7 RESOLVED CLOSES REMAIN.** Titan's measured `ai_exit` rate in this era is **4 closes in 13.0 days = one
+per 3.26 days** (one per 3.55 days on an interval basis), 67 % of all live closes. Seven more is therefore
+**≈ 23–25 days — roughly 3.5 weeks, i.e. the first week of October 2026** — plus each counterfactual's own
+resolution lag (1h, 6.7h and 39h for the three so far). `EXIT_ADVISOR_DRYRUN` **stays False**; nothing here
+flips it, and the rule says 10.
 
 🔴 **THE vpos 105 CLOSING VERDICT CHECKED AGAINST ITS PROMPT (trades 31259, 23:46:01 UTC, `close` 0.72, hourly).**
 Every number the verdict quotes that the prompt contains is right: 5m BULL / 15m NEUTRAL, ADX15m 39.8 vs 20.9,
@@ -147,6 +174,46 @@ a reading, not an error. The trail was NOT armed at the close (water_mark 77 750
 prompt rendered the unarmed form of (b)/(c): *"NOT ARMED — it arms only at +1R … would arm at 77231.3 … a further
 0.50R"*. (The operator's card put the arm at 77 480.6; the row and the prompt say 77 231.3 = entry − 1 031.9.)
 No second consultation: one consult row in 19:45–23:59 at 23:46:01, one `CLOSING at market` in the journal since entry.
+
+🔴 **THE vpos 106 CLOSING VERDICT CHECKED AGAINST ITS PROMPT (trades 31884, 2026-09-12 09:15:09 UTC, `close`
+0.72, model `claude-haiku-4-5-20251001`, 881 chars against the 1 200 cap).** 🔴 **Trigger: `15m_exit_confirm`
+on a `Bullish I-BOS`, NOT the hourly** — thirteen consecutive hourly reviews from 22:00:36 to 09:01:46 all
+returned **hold** (conf 0.72, one 0.62); the fourteenth consultation, 13 minutes after the last hold and fired
+by an adverse 5m structure print, closed it. (The trades row carries `status='exit_ai_dryrun'`; that is a
+LABEL on the consultation row and not a mode — `EXIT_ADVISOR_DRYRUN` is **False** and the position really did
+close, `close_reason='ai_exit'`.)
+
+**IT CITED ALL FIVE FACTS — the first verdict in this population to do so.**
+**(a) cost of closing:** *"Closing cost 0.060R (24% of unrealised) is acceptable"* — the prompt says 0.060R and
+24 %. ✅ **(b) the stop is already there, floor on holding:** *"Unrealised loss −0.25R with 0.75R buffer to
+stop; holding risks full 1.0R stop-loss"* — this is the fact **vpos 105's verdict did NOT cite**; 106 did. ✅
+**(c) what an early close surrenders:** *"Trailing stop not armed; no asymmetric upside protection exists."*
+✅ cited — 🔴 **but inverted, exactly as vpos 105 inverted it**: the prompt offers the unarmed trail as what
+closing *gives up* (*"It would arm if price reaches 75726.8 (+1R). A further 0.94R of favourable movement would
+arm it; closing now gives that up"*), and both verdicts read it as a *reason to close*. Neither the arm price
+nor the 0.94R appears in the verdict. **(d) direction of travel:** *"given back 0.31R from +0.06R MFE with no
+fresh lower low"* — the prompt's since-last block reads −0.24R → −0.25R and MFE +0.06R → +0.06R. ✅
+**(e) the entry thesis, named:** *"At entry, 15m+1h+5m aligned SHORT with ADX 31.0 (15m) … The bearish I-CHOCH+
+at entry (weight 0.9) is contradicted by Bullish I-CHOCH 25m ago"* ✅ — and note the entry-thesis block it read
+carried `NOT counted by the gate — this category's own signals disagree (LONG 2.00 / SHORT 2.50 across 3
+signals)`, the label whose **names and ages** §0.MATRIX-TIER-NAMES has now added.
+
+**EVERY NUMBER IT QUOTES IS RIGHT.** ADX15m 31.0 → 14.1 (−54 %, prompt values give −54.5 %), ADX1h 21.9 → 11.1
+(−49 %, gives −49.3 %), supporting wall ×9.0 → ×7.0, opposing wall 90th pct, imbalance 0.60 → 0.54, giveback
+0.31R from +0.06R MFE, 11.2h elapsed, −0.25R unrealised, +0.75R to stop, −1.00R floor, closing cost 0.060R =
+24 %. **No misreading of the vpos 104/105 class was found.** It honoured the 🔴 UNPAIRED warning — it claimed no
+1d/4h/1h *trend* change and used only ADX1h, which the prompt does render on both lines — and it stated the
+90th-percentile opposing wall as a NOW value, never as a change, which is what that block demands.
+
+**THE TRAIL WAS NOT ARMED, AND COULD NOT HAVE BEEN.** Arm price = entry − 1R = 77 014.2 − 1 287.4 =
+**75 726.8**. The water mark over the whole 11.2h life was **76 936.5** — 1 209.7 points short, i.e. **0.94R**
+of favourable movement never delivered. In the 5h since the close the low is 77 224.8, so the arm is no nearer.
+
+🔴 **AND THE VERDICT IS, SO FAR, NOT WRONG.** Price stood at 77 337.9 shortly after the close and 77 368.8 at
+14:23 — the original stop 78 301.6 has **not** been touched, so the hold has not been rescued and it has not
+been punished either. Held to this minute the position would be **−0.3354R (−$0.82)** against the advisor's
+realised **−0.2963R (−$0.72)**: **holding would have been WORSE by 0.0391R = $0.10.** That is a
+mark-to-market on an open counterfactual and **counts for nothing** until it hits the stop or arms and trails.
 
 **THE OLD POPULATION — FOR CONTRAST ONLY, NEVER POOLED:** vpos 87–98, ten `ai_exit` closes under the
 two-sentence prompt, **Σ net −$5.848, ΣR −2.6048** (87 −0.82, 88 −0.53, 89 +2.30, 90 −0.61, 91 −0.64,
@@ -258,6 +325,65 @@ a predicate per alarm stage that requires a positive venue reading, never resolv
 (May / July); what changed is `/etc/systemd/system` itself at **13:38:37 UTC** — `snap-ffmpeg\x2d2404-156.mount`
 was added (a snapd refresh of the ffmpeg snap). A `daemon-reload` is harmless but was not run: nothing of
 Titan's is stale. **Recorded only.**
+
+## ✅ §0.MATRIX-TIER-NAMES — what the score gate counted, NAMED and AGED. **APPLIED 2026-09-12 14:18:13 UTC, FROM FLAT.**
+
+The prompt shows the state-machine SLOTS, which keep only the latest signal per slot. The score gate counts
+EVERY signal still inside its `CATEGORY_TTL_MINUTES` window and **zeroes** a category holding both a LONG and
+a SHORT (`signal_matrix.py:377-381`).
+
+**Measured 2026-09-12 over every stored Titan entry consultation: 1,217 of 3,074 (39.6%) showed a directional
+tier whose category the gate had zeroed, on 92 of 104 days; 825 (26.8%) showed it AGREEING with the proposed
+side.** SOL's own figure, measured 2026-09-11: **2,265 of 4,598 (49.3%) on 92 of 92 days; 1,453 (31.6%) agreeing.**
+
+🔴 **Titan is NOT SOL on this.** `signal_tiers.py` has labelled the zeroing since 2026-07-29 (`§2.8`) and labelled
+it correctly since 2026-08-03 (`6d9281d`). **142 of 142 (100%)** zeroed tier-instances in the current prompt form
+already carried "NOT counted by the gate"; all 21 live entries fall inside that era, so **no live Titan entry was
+ever shown an unlabelled zeroed tier.** SOL had 11 of 16 live entries in exactly that state.
+
+**WHAT THIS ADDS:** the **names** of the disagreeing signals and their **ages against the window** (the points
+alone cannot separate a simultaneous 5-minute print from a 60-of-90-minute leftover), and the **reverse** — 19
+consultations in the record, 15 in the current form, all on the 15m, where the slot reads ABSENT while the gate
+counted a direction.
+
+🔴 **THIS IS LEGIBILITY, NOT A MEASURED EDGE.** Live: 9 entries with a zeroed agreeing tier made ΣR **+0.045**
+over 8 closes, the 10 without made **−3.353**, the 2 opposing made **−1.524**. Paper carries the **OPPOSITE**
+sign (**−8.477** over 24 against **+4.110** over 25). 8 vs 10 vs 2, and two books disagreeing: **NOT RANKED, and
+no later pass may cite these cells as an effect.**
+
+**Nothing computed changes:** not the score, not the cascade / score / book / risk gates, not the slots, and not
+the `Agreement:` sentence, which still counts the slots (contract case [4] pins it byte-identical).
+
+**SCOPE — `signal_tiers.py` ALONE.** `matrix_result` already reached the builder at `main.py:2434` and
+`main.py:4858`, and `active_signals` was already inside it. `claude_advisor.py`, `main.py`, `config.py`,
+`signal_matrix.py` and `state_machine.py` are **zero bytes, zero AST nodes** of this change. The four advisor
+SYSTEM prompts are unchanged, verified by sha256 AFTER the apply:
+`_ENTRY_SYSTEM` 30c979595a4831aa · `_LEARNING_SYSTEM` 191cf5d71ebf3865 · `_CLOSE_SYSTEM` 7d7707cfa2d336f7 ·
+`_CLOSE_SYSTEM_RICH` 3d709571e17ff405; `claude_advisor.py` whole file ca14e959a5c6104c — all identical to the
+2026-09-12-0020 baseline.
+
+**APPLIED:** `signal_tiers.py` sha256 `ac32ba1227285576` → `4af4fdba57cfaf84` (+145 / −2 lines; three new
+top-level helpers `_sides_in_window`, `_sides_phrase`, `_gate_holds_phrase`). Backup
+`signal_tiers.py.bak_matrixnames_20260912T141553Z` **is byte-identical to the file it replaced**. AST proof re-run
+against the applied file and that backup: **PASS** — after stripping exactly this change the remainder is
+`ast.dump`-identical to the pre-change file. Contract `tests/test_entry_tiers_matrix_names_ages.py` (new
+directory `/root/titan-bot/tests/`): **8 of 8 green as root and as botuser.** Restarted from a proven-flat
+book 2026-09-12 14:18:13 UTC, MainPID 961100 → 1563560, boot line
+`RECONCILE-XDB ✅ exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`.
+`openitems_guard` EXIT=0 before and after.
+
+🔴 **HONEST SCOPE LIMIT.** The names/ages clause is gated on `active_signals` and **vanishes** without it —
+byte-identical, contract case [1]. The **reverse** clause is gated on the `breakdown`, which every live row
+carries, so it IS a genuine new line whenever that shape occurs (15 of 221 current-form consultations); case
+[5b] pins that without `active_signals` it states the direction and omits the names and ages.
+
+**A pre-existing defect found and deliberately NOT fixed:** `signal_tiers.build()`'s docstring says "Never
+raises", and it already raised `AttributeError` on a truthy non-dict `matrix_result`. This change neither
+introduces nor repairs it; contract case [0] asserts **parity, not repair**. Both live call sites pass
+`signal_matrix.compute_score()`'s dict, so it cannot occur in production. Flagged, not silently patched.
+
+Record: `reports/2026-09-12-0020-titan-defect-a-was-already-fixed-on-titan-what-is-missing-is-the-names-and-the-ages.md`
+(the measurement and the held patch) and `reports/2026-09-12-1430-titan-matrix-tier-names-applied-and-the-exit-advisor-ledger-resolved.md` (the apply).
 
 ## ✅ §0.PROMPT-PAIRING — **CLASS CLOSED 2026-08-31. FOUR INSTANCES, ALL FIXED. SWEEP COMPLETE.**
 
