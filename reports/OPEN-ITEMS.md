@@ -10,9 +10,26 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `d070a5f`, re-verified at 2026-09-21 18:17 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `40aad46`, re-verified at 2026-09-21 18:32 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `d070a5f`, `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`40aad46` — ✅ THE FAILED-READ WORK IS FINISHED FOR EVERY CALLER THAT ACTS, BAR ONE; ARMED EXITS ARE LABELLED
+`armed_exit`. APPLIED FROM FLAT AND LOADED by the 2026-09-21 18:31:13 UTC restart** (MainPID 3997369 → 4001002, worker
+4001096; boot line `[TITAN][RECONCILE-XDB] ✅ exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open
+row(s)`; 0 boot errors). Four functions, nothing else (AST: main.py 160/160, breakeven_worker 47/47):
+(1) `breakeven_worker._emergency_close` now TRIPS `virtual_trader._UNSAFE_STATE` when the verification read says STILL
+OPEN or UNKNOWN (detail names the state and contracts) — the same breaker as the entry failsafe, cleared the same way:
+a service restart; FLAT unchanged, breaker not tripped. (2) `main._handle_5m_close_via_ai` and (3)
+`main._handle_liquidity_sweep` read the side three-state (double probe, 2 attempts): UNKNOWN is logged as a failed read
+(no consultation / sweep close NOT evaluated), never "no open position" / "nothing to close"; FLAT byte-identical; OPEN
+keeps the same exchange dict. (4) `main._execute_armed_exit` writes `close_reason='armed_exit'` instead of the default
+`external` — historical rows (vpos 95, 109) untouched. Contracts, root AND botuser, live `trades.db` opened 0 times:
+`test_failed_read_never_reports_safety` 15/15 (RED on `d070a5f`: M2 M4 M6), `test_last_callers_and_armed_exit_label`
+13/13 (RED on the `.bak`: V1 V4 W1 L1 L2), `test_vpos_fill_failed_read_is_not_flat` 19/19. State-table values and all
+four advisor SYSTEM prompts byte-identical in the LOADED bytecode. 🔴 **Correction to the vpos 109 premise — see
+`§0.EXIT-ADVISOR-RULE`.** `openitems_guard` EXIT=0 before and after.
+Record: `reports/2026-09-21-1845-titan-failed-read-work-finished-breaker-last-callers-armed-exit.md`
 
 **`d070a5f` — ✅ A FAILED POSITION READ NEVER REPORTS SAFETY IN THE TWO EMERGENCY PATHS. APPLIED FROM FLAT
 AND LOADED by the 2026-09-21 18:16:14 UTC restart** (MainPID 3989951 → 3997369, worker 3997377; boot line
@@ -192,7 +209,9 @@ fail when a long reader and any writer overlap.
   🟢 **DONE 2026-09-21 18:15 UTC on the operator's approval** — exactly that UPDATE, **2 rows affected**, `.bak`
   `trades.db.bak_relabel_20260921T181534Z` (online backup API, integrity ok); row 15604 NOT touched; nothing reconstructed.
 
-## 🔴 §0.FAILED-READ-CALLERS — THE SHIM'S OTHER CONSUMERS. Written 2026-09-21; the two SAFETY-direction callers MIGRATED in `d070a5f`.
+## 🔴 §0.FAILED-READ-CALLERS — THE SHIM'S OTHER CONSUMERS. Written 2026-09-21; safety-direction callers MIGRATED in `d070a5f`, the last two acting callers in `40aad46`.
+
+🟢 **2026-09-21 18:31 (`40aad46`): every DIRECT live consumer of the shim whose None branch acts is migrated.** 🟡 **ONE remains, and it is the shared primitive: `main.py:1357` `_execute_close_position`.** On a failed read it aborts the close and returns None. `virtual_trader._do_close` then keeps the row OPEN and the poller retries next tick with the exchange stop still in place — no safety is claimed. But one caller surfaces that None as a statement: **the armed exit sends "Armed exit fired but no live position" and has already cleared `exit_pending`**, so on a failed read the armed exit is dropped with a false message. Migrating the primitive changes 8 callers — its own pass. Dead in live: `main.py:3926` / `4340` (`engine_owns_position()` is True). Dormant: `breakeven_worker.py:734`, `788`, `807` (`breakeven_jobs` has 0 rows ever). Benign: `breakeven_worker.py:425` (old stop held, retried). `main.py:3669` is `40aad46`'s own call, reached only after the double probe says OPEN.
 
 🟢 **Migrated (`d070a5f`, 2026-09-21 18:16):** the entry failsafe and the BE emergency close — the only two that reported SAFETY on a failed read. 🟡 **Next pass — still pending:** `main.py:3663` `_handle_5m_close_via_ai` and `main.py:4068` `_handle_liquidity_sweep` — they TAKE actions (skip a consultation / a sweep close, send a false "No open LONG") but declare no safety.
 
@@ -205,9 +224,9 @@ fail when a long reader and any writer overlap.
 | ↳ `virtual_trader.py:207` entry failsafe | ~~None read as "nothing is exposed"~~ → 🟢 **`d070a5f`:** re-read; FLAT → as before, OPEN → retry, UNKNOWN → retry then breaker TRIPPED + "READ FAILED, EXPOSURE UNKNOWN" | 🟢 migrated |
 | ↳ `breakeven_worker.py:475` emergency close | ~~"✅ Emergency close executed" whatever the result~~ → 🟢 **`d070a5f`:** verified after the close; ✅ only on FLAT, "DID NOT FLATTEN" on OPEN, "OUTCOME UNKNOWN" on UNKNOWN | 🟢 migrated |
 | ↳ `virtual_trader._do_close` (via market_close) | "VIRTUAL CLOSE ABORTED … row left OPEN", retried next tick | 🟡 a wanted close deferred ≥ 10 s; exchange stop still in place |
-| `main.py:3663` `_handle_5m_close_via_ai` | side treated as not open → exit consultation skipped | 🟡 a missed advisor decision |
+| `main.py:3663` `_handle_5m_close_via_ai` | ~~side treated as not open~~ → 🟢 **`40aad46`:** UNKNOWN logged as read FAILED, row `position_read_failed`, no consultation; FLAT/OPEN unchanged | 🟢 migrated |
 | `main.py:3900` `_handle_exit_signal` | only when `engine_owns_position()` is False — **dead in live** (`ROUTING_MIGRATED_TO_ADAPTER=True`) | ⚪ |
-| `main.py:4068` `_handle_liquidity_sweep` | "No open LONG — nothing to close" message + return | 🟡 a false message, a skipped sweep close |
+| `main.py:4068` `_handle_liquidity_sweep` | ~~"No open LONG — nothing to close"~~ → 🟢 **`40aad46`:** UNKNOWN says read FAILED, sweep close NOT evaluated (`sweep_read_failed`); FLAT/OPEN unchanged | 🟢 migrated |
 | `main.py:4291` trend-reversal | only when `engine_owns_position()` is False — **dead in live** | ⚪ |
 | `breakeven_worker.py:425` `move_stop_with_race_guard` | after a failed cancel → `'closed'`; caller persists nothing, **old stop held**, retries | 🟢 benign |
 | `breakeven_worker.py:765` (and :692, :746) job path | marks the job closed + reports a passive fill | ⚪ dormant: `breakeven_jobs` has 0 rows ever |
@@ -235,7 +254,18 @@ population.** vpos 95 (2026-08-24, `close` 0.72 two seconds before an `external`
 vpos 101 and stays in the OLD POPULATION; vpos 99 (`external`) was preceded by a `hold`, not a close; every `sl` / `trail`
 close from vpos 101 on was preceded by a `hold`. (vpos 86, 2026-07-30, before the population: its last consultation was a
 `close` 59 min before its stop fired, and it was not closed on it — noted, not investigated here.) The label defect itself
-(armed-exit closes written as `external`) is NOT fixed — separate pass.
+(armed-exit closes written as `external`) is NOT fixed — separate pass. → 🟢 **FIXED going forward in `40aad46`:** the
+armed exit now writes `close_reason='armed_exit'`; vpos 95 and 109 keep `external`.
+
+🔴🔴 **CORRECTION 2026-09-21 18:3x — THE vpos 109 PREMISE WAS WRONG, AND IT WAS MINE.** The armed exit is a MECHANICAL
+exit: `exit_pending` armed by the 60m exit signal + an opposite confirm print → `_execute_armed_exit` closes
+UNCONDITIONALLY. The advisor IS consulted on that path (`consult_exit_advisor(... 'armed_exit')`, main.py) but the
+return value is DISCARDED — `consult_exit_advisor` "can never close a position", and no armed-exit call site reads the
+verdict. The 2026-09-21 17:20 report called vpos 109 "closed by the advisor"; it was closed by the armed exit, and the
+advisor merely AGREED (`close=True` 0.72) — had it said hold, the position would have closed anyway. The ruling above
+("the rule measures advisor DECISIONS") therefore rests on a false fact. **The ledger row stays as ruled until the
+operator re-decides.** Without row 6 the ledger is **5 of 10, Σ +1.0497R / +$1.72** (still positive; the rule does not
+fire either way). This is also why the new label is `armed_exit`, not an advisor label.
 
 **THE MEASURE.** For each such close: the advisor's realised R (`net_pnl / initial_risk_usdt`, as
 everywhere in this canon) **minus the counterfactual R of having HELD the position to the trail-or-stop
