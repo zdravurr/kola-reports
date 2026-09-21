@@ -10,9 +10,21 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `07f9025`, re-verified at 2026-09-21 18:51 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `f53d048`, re-verified at 2026-09-21 19:05 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `40aad46`, `d070a5f`, `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `07f9025`, `40aad46`, `d070a5f`, `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`f53d048` — ✅ THE FAILED-READ CLASS IS CLOSED: the post-entry critical close and the advisor close. APPLIED FROM FLAT
+AND LOADED by the 2026-09-21 19:03:51 UTC restart** (MainPID 4004539 → 4007821, worker 4007905; boot line
+`[TITAN][RECONCILE-XDB] ✅ exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`; 0 boot
+errors). `virtual_trader.py` only, two functions (AST 76/76): `_run_recheck_tier` now marks `closed_critical` and sends
+"EMERGENCY CLOSE" only AFTER the close outcome is known; on an unconfirmed close it leaves the tier to re-fire, trips
+`_UNSAFE_STATE` (operator's ruling) and sends ONE hands-required alert per vpos. `_advisor_close` never claims "no live
+position" on a failed read: OPEN retries, UNKNOWN alerts "close NOT confirmed" (no breaker — the exchange stop is in
+place and the next verdict retries). Contract `test_recheck_and_advisor_close_failed_read`: RED on `07f9025` (R1 R1b R3 R4
+R5 V1 V3), GREEN 13/13; the four earlier contracts GREEN (12/13/15/19) — root AND botuser, live `trades.db` opened 0
+times. No ledger close was affected: all 7 advisor `close` verdicts since 09-01 were followed by a close within 2 s.
+`openitems_guard` EXIT=0 before and after. Record: `reports/2026-09-21-1915-titan-failed-read-class-closed-recheck-and-advisor-close.md`
 
 **`07f9025` — ✅ AN ARMED EXIT (AND A 5m ADVISOR CLOSE) IS NEVER DROPPED ON A FAILED READ. APPLIED FROM FLAT AND
 LOADED by the 2026-09-21 18:49:23 UTC restart** (MainPID 4001002 → 4004539, worker 4004551; boot line
@@ -225,6 +237,26 @@ fail when a long reader and any writer overlap.
   `trades.db.bak_relabel_20260921T181534Z` (online backup API, integrity ok); row 15604 NOT touched; nothing reconstructed.
 
 ## 🔴 §0.FAILED-READ-CALLERS — THE SHIM'S OTHER CONSUMERS. Written 2026-09-21; safety-direction callers MIGRATED in `d070a5f`, the last two acting callers in `40aad46`.
+
+🟢🟢 **2026-09-21 19:04 (`f53d048`) — IS THERE NOW ANY LIVE CALLER WHOSE None BRANCH DROPS AN ACTION OR CLAIMS A FACT? NONE.**
+
+| live caller | on a FAILED position read | fixed in |
+|---|---|---|
+| `virtual_trader._reconcile_passive_fill` | UNKNOWN → one log line, nothing done, re-checked next tick | `7798f51` |
+| `virtual_trader._entry_failsafe_close` | re-read three-state; UNKNOWN → retried, then breaker TRIPPED + "READ FAILED, EXPOSURE UNKNOWN" | `d070a5f` |
+| `breakeven_worker._emergency_close` | verified after every close; OPEN / UNKNOWN → "DID NOT FLATTEN" / "OUTCOME UNKNOWN" + breaker TRIPPED | `d070a5f`, `40aad46` |
+| `main._handle_5m_close_via_ai` (side read) | "position read FAILED", no consultation; next signal / hourly review re-consults | `40aad46` |
+| `main._handle_liquidity_sweep` | "read FAILED — sweep close NOT evaluated" | `40aad46` |
+| `main._execute_armed_exit` | `exit_pending` kept ARMED, "close NOT confirmed"; OPEN retried | `07f9025` |
+| `main._handle_5m_close_via_ai` (advisor close) | row `close_unconfirmed`, "AI CLOSE NOT confirmed"; OPEN retried | `07f9025` |
+| `virtual_trader._run_recheck_tier` (critical close) | NOT marked, tier re-fires, breaker TRIPPED, one hands-required alert; OPEN retried | `f53d048` |
+| `virtual_trader._advisor_close` (`ai_exit`) | "close NOT confirmed" alert, next verdict decides (no breaker); OPEN retried | `f53d048` |
+| `virtual_trader._process_position` sl / trail / breakeven closes | a DEFERRAL by design: row stays OPEN, the trigger persists, retried next tick, exchange stop in place — no drop, no claim | — |
+| `breakeven_worker.move_stop_with_race_guard` | after a failed cancel returns `'closed'`; caller persists nothing, OLD stop held, retried next tick | — (benign) |
+
+Not live: `main.py:3926` / `4340` shim reads and the legacy SL-failsafe in `main._execute_entry` (`engine_owns_position()`
+is True), the trend-reversal close (`TREND_REVERSAL_EXIT_DRYRUN = True`), the Smart-TP sweep close
+(`EQH_EQL_SMART_TP_ENABLED = False`), the `breakeven_jobs` path `breakeven_worker.py:734/788/807` (0 rows ever).
 
 🔴 **2026-09-21 18:49 (`07f9025`) — IS THERE ANY REMAINING LIVE CALLER WHOSE None BRANCH DROPS AN ACTION OR CLAIMS A
 FACT? YES, TWO. The answer is NOT none.** Fixed in `07f9025`: the armed exit (`exit_pending` now cleared only once the
