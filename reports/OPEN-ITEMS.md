@@ -29,7 +29,7 @@ keeps the same exchange dict. (4) `main._execute_armed_exit` writes `close_reaso
 13/13 (RED on the `.bak`: V1 V4 W1 L1 L2), `test_vpos_fill_failed_read_is_not_flat` 19/19. State-table values and all
 four advisor SYSTEM prompts byte-identical in the LOADED bytecode. 🔴 **Correction to the vpos 109 premise — see
 `§0.EXIT-ADVISOR-RULE`.** `openitems_guard` EXIT=0 before and after.
-Record: `reports/2026-09-21-1845-titan-failed-read-work-finished-breaker-last-callers-armed-exit.md`
+Record: `reports/2026-09-21-1845-titan-failed-read-work-finished-breaker-last-callers-armed-e.md`
 
 **`d070a5f` — ✅ A FAILED POSITION READ NEVER REPORTS SAFETY IN THE TWO EMERGENCY PATHS. APPLIED FROM FLAT
 AND LOADED by the 2026-09-21 18:16:14 UTC restart** (MainPID 3989951 → 3997369, worker 3997377; boot line
