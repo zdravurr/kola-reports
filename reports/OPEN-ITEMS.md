@@ -10,9 +10,27 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `f16c271`, re-verified at 2026-09-12 15:00 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `7798f51`, re-verified at 2026-09-21 18:10 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`7798f51` — ✅ A FAILED POSITION READ IS NOT A FLAT BOOK. APPLIED FROM FLAT AND LOADED by the
+2026-09-21 17:39:09 UTC restart** (MainPID 1572470 → 3989951, worker 3989975; boot line `[TITAN][RECONCILE-XDB] ✅
+exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`; 0 boot errors).
+`virtual_trader.py` **alone**, ONE function — `_reconcile_passive_fill` — sha256 `3b0b49d9c5d4e092` → `4184eb8ff1f59095`,
+76 / 76 top-level nodes, **only that one differs** (AST). It read the position through `main._fetch_open_position`, the
+shim that maps POS_UNKNOWN onto None; its None branch is the hands-required `POSITION GONE, STOP DID NOT FILL … MANUAL
+ACTION REQUIRED`. Since the 2026-09-12 restart **2 of 2 failed reads** (BingX 109500, 06:20:16 and 08:15:36 on vpos 111)
+became that alarm on a live position that closed on its own trail at +2.82R. Now `main._fetch_position_state(double_probe=True,
+attempts=2)`: UNKNOWN → one log line, nothing done, re-checked next tick; OPEN → as before; **a true flat on both probes still
+reaches `read_filled_protective_order` and the alarm, byte-for-byte**. Contract `tests/test_vpos_fill_failed_read_is_not_flat.py`:
+**RED 7 of 19 on the unpatched file, GREEN 19 of 19 on the patch, as root AND as botuser** (sha256-pinned copies); it opens the
+live `trades.db` **0 times** (kernel `openat` trace). Read back out of the LOADED bytecode: `_reconcile_passive_fill` names
+`_fetch_position_state` + `POS_UNKNOWN`, not `_fetch_open_position`; every value in the state table and all four advisor
+SYSTEM prompts (sha256) byte-identical before/after. Flat before the restart: 0 open rows, 0 `exit_pending`, 0 live
+`breakeven_jobs`; BingX 0 positions / 0 orders on BOTH probes, error list empty. 🔴 **The other callers of the shim are NOT
+migrated — see `§0.FAILED-READ-CALLERS`; two of them sit in EMERGENCY paths.** `openitems_guard` EXIT=0 before and after.
+Record: `reports/2026-09-21-1815-titan-failed-read-fix-loaded-vpos-109-ruled-in-lock-measured.md`
 
 **`f16c271` — ✅ THE UNARMED-TRAIL FACT LEADS WITH THE OPTION. APPLIED FROM FLAT AND LOADED by the
 2026-09-12 14:58:32 UTC restart** (MainPID 1563560 → 1572470; boot line `RECONCILE-XDB ✅ exchange and DB agree
@@ -113,6 +131,64 @@ facts only — no new guidance, no threshold. `_CLOSE_SYSTEM_RICH` byte-identica
 15m/5m (82/84 populated, NULL prints `not recorded`); 1d/4h/1h are marked ENTRY-ONLY because
 the sample table has no such column at all (313/313). `_CLOSE_SYSTEM_RICH` byte-identical.**
 
+## 🔴 §0.VENUE-VS-DB — A REAL-MONEY ROUND TRIP WITH NO `virtual_positions` ROW. Written 2026-09-21.
+
+**Every ledger built on `virtual_positions` is blind to this by design** (the entry failsafe writes no row), so it is
+recorded here, where the DB book and the BingX book can be reconciled:
+
+| field | value |
+|---|---|
+| BingX positionId | **2101906879672446978** — LONG 0.0018, 5×, cross |
+| open | order `2101906879651475456`, MARKET BUY @ **81 577.8**, 2026-09-21 05:30:26 UTC, fee −0.073420 |
+| stop | order `2101906881789931520`, STOP_MARKET 80 686.0, **CANCELLED** 05:30:32.754, executedQty 0 |
+| close | order `2101906906608267264`, reduce-only MARKET SELL @ **81 552.1**, 05:30:33 UTC, fee −0.073397 |
+| realised / commission / **net** | −0.0463 (income −0.04626) / −0.14682 / **−$0.1931** (−0.120R on a 891.8-pt 1R) |
+| cause | `sqlite3.OperationalError: database is locked` at `virtual_trader.py:987`, AFTER the fill → `[ENTRY-FAILSAFE]` closed at market in 7 s |
+| signal rows | 34280 `Within Bullish OB` status `failed`; **34281 `Bullish OB Created` and 34282 `Bullish I-CHOCH+` stuck `pending`** (their status writes were lost to the same lock); which of the three owned the fill is NOT provable |
+
+**Reconciliation rule:** venue net P&L = Σ `virtual_positions.net_pnl` + Σ rows of THIS table. Rows: 1. Σ −$0.1931.
+
+## 🔴 §0.DB-LOCK — WHAT HOLDS `trades.db`. Measured 2026-09-21, read-only. NOTHING CHANGED.
+
+Lock errors since 2026-09-12: 09-18 16:18 (2), 09-18 20:00–20:11 (5), **09-21 05:30 (13 — the round trip above)**,
+09-21 17:01 (1). `journal_mode=delete`; most connects use the default **5 s** busy timeout (post_exit_observatory and
+skip_attribution use 30 s). In rollback-journal mode a writer that wants to commit takes PENDING and waits for every
+reader to drain, and **while it waits no new reader can start** — so plain SELECTs (`virtual_trader.py:731`, `:987`)
+fail when a long reader and any writer overlap.
+- **Writers commit promptly:** 119 `with <connection>` blocks in 20 files, 59 write — **0 hold a write across a network
+  / slow call** (AST scan).
+- **The long holders are READERS on the webhook scoring path.** `trades` has **no secondary index** (33 422 wide rows,
+  ~110 MB). Timed on a copy, warm / cold: `orderbook_density` percentile scans `_exit_pct` **96 ms / 3 118 ms**,
+  `_rank_walls` **185 ms / 2 776 ms** (17 call sites per scored signal); `market_context` `COUNT(*)` on `trades`
+  **62 ms / 2 670 ms**; the signal-audit thread's `SELECT * FROM trades` **73 ms / 2 205 ms** (every 10 min).
+  virtual_trader poller ≤ 21 ms, mfe_worker ≤ 13 ms cold. At 05:30:15 three signals were scored at once.
+- **Live, passive (`/proc/locks`, 16 min):** 2026-09-21 17:42:45–17:58:45 UTC, 196 390 samples (~4.9 ms), 616 held-lock intervals, 2 webhooks in the window, warm cache: the Titan worker's SHARED p50 10.7 / p99 77.5 / max 106 ms, RESERVED max 19 ms, EXCLUSIVE (commit) max 58 ms; **the longest hold in the window was this investigation's own backup copy, SHARED 1 915 ms** (under the 5 s timeout; 0 lock errors in Titan since the 17:39 restart). No other process touched the file. Warm, nothing comes near 5 s; the 05:30 event needs cold pages plus concurrent scoring scans (three signals at once), which a 16-min window without a signal burst cannot reproduce — **the 05:30 holder is still not named by observation**, only bounded by measurement.
+- **Candidates, NOT applied:** (1) `PRAGMA journal_mode=WAL` — readers never block a writer and a writer never blocks
+  readers, so a SELECT can no longer fail "database is locked"; writers still serialise. Persistent, file-level, affects
+  every process that opens the file — its own from-flat pass. (2) take the percentile scans off the hot path (cache the
+  baseline, or index `orderbook_density(source)`). (3) a longer busy timeout on the entry path. **The two `pending` rows are
+  NOT rewritten:** `UPDATE trades SET status='failed' … WHERE id IN (34281,34282) AND status='pending'` is safe (no code reads
+  `trades.status='pending'`; skip_attribution already holds both as `failed`; only `silence_digest`'s status count moves)
+  but it restores a label, not the lost advisor fields — operator's call. A third, older one exists: row 15604 (2026-07-13).
+
+## 🔴 §0.FAILED-READ-CALLERS — THE SHIM'S OTHER CONSUMERS. NOT MIGRATED (separate pass). Written 2026-09-21.
+
+`main._fetch_open_position` and `breakeven_worker._fetch_open_position` both return None for "flat" AND "read failed".
+`_reconcile_passive_fill` was migrated in `7798f51`. The rest, with what the None branch DOES:
+
+| caller | None branch | risk |
+|---|---|---|
+| `main.py:1357` `_execute_close_position` | returns None → the close is ABORTED, no order sent | 🔴 feeds the two emergency rows below |
+| ↳ `virtual_trader.py:207` entry failsafe | None read as "**nothing is exposed**" → alert + return, `_UNSAFE_STATE` NOT tripped | 🔴🔴 a failed read declares a possibly naked position safe |
+| ↳ `breakeven_worker.py:475` emergency close | sends "✅ **Emergency close executed**" whatever the result | 🔴🔴 same — false success after stop cancelled + recreate failed |
+| ↳ `virtual_trader._do_close` (via market_close) | "VIRTUAL CLOSE ABORTED … row left OPEN", retried next tick | 🟡 a wanted close deferred ≥ 10 s; exchange stop still in place |
+| `main.py:3663` `_handle_5m_close_via_ai` | side treated as not open → exit consultation skipped | 🟡 a missed advisor decision |
+| `main.py:3900` `_handle_exit_signal` | only when `engine_owns_position()` is False — **dead in live** (`ROUTING_MIGRATED_TO_ADAPTER=True`) | ⚪ |
+| `main.py:4068` `_handle_liquidity_sweep` | "No open LONG — nothing to close" message + return | 🟡 a false message, a skipped sweep close |
+| `main.py:4291` trend-reversal | only when `engine_owns_position()` is False — **dead in live** | ⚪ |
+| `breakeven_worker.py:425` `move_stop_with_race_guard` | after a failed cancel → `'closed'`; caller persists nothing, **old stop held**, retries | 🟢 benign |
+| `breakeven_worker.py:765` (and :692, :746) job path | marks the job closed + reports a passive fill | ⚪ dormant: `breakeven_jobs` has 0 rows ever |
+
 ## 🔴🔴 §0.EXIT-ADVISOR-RULE — THE STOPPING RULE FOR THE LIVE EXIT ADVISOR, STATED IN MONEY. Written 2026-09-09 20:55 UTC.
 
 🔴 **Until this entry existed the rule lived only in the operator's head** (adopted 2026-08-30 with the
@@ -124,6 +200,19 @@ designed: any trail or stop between two advisor closes breaks the run, which is 
 **THE POPULATION.** Every LIVE close with `close_reason = 'ai_exit'` from **vpos 101 onward** — vpos 101
 (2026-09-01) is the first close under the 1 200-char reason cap and the four rendered facts of 2026-08-30.
 Nothing older belongs here (see the OLD POPULATION below).
+
+🔴 **POPULATION CLARIFIED 2026-09-21 (operator's ruling): every LIVE close, from vpos 101 onward, where the advisor
+returned `close=True` — whatever `close_reason` the row carries.** The rule measures advisor DECISIONS; the label is
+bookkeeping. The armed-exit path (`[EXIT-ADVISOR-LIVE] trigger=armed_exit … close=True` → `ARMED_EXIT_CLOSE`) writes
+`close_reason='external'`, so **vpos 109** — closed on the advisor's `close=True conf=0.72` at 2026-09-18 23:45:10 — was
+outside the letter of the old wording. 🔴 **This clarification ADDS A NEGATIVE-DELTA ROW (−0.1699R): it moves the sum
+AGAINST the advisor — the conservative direction, not a selection in its favour.** Scan of the whole live book (vpos
+86–111) for an advisor `close` decision in the 180 s before a non-`ai_exit` close: **vpos 109 is the only one in the
+population.** vpos 95 (2026-08-24, `close` 0.72 two seconds before an `external` close) has the same shape but predates
+vpos 101 and stays in the OLD POPULATION; vpos 99 (`external`) was preceded by a `hold`, not a close; every `sl` / `trail`
+close from vpos 101 on was preceded by a `hold`. (vpos 86, 2026-07-30, before the population: its last consultation was a
+`close` 59 min before its stop fired, and it was not closed on it — noted, not investigated here.) The label defect itself
+(armed-exit closes written as `external`) is NOT fixed — separate pass.
 
 **THE MEASURE.** For each such close: the advisor's realised R (`net_pnl / initial_risk_usdt`, as
 everywhere in this canon) **minus the counterfactual R of having HELD the position to the trail-or-stop
@@ -138,6 +227,26 @@ counts for nothing until it does.
 🔴 **THE STOPPING RULE. At 10 such closes: if Σ(advisor R − counterfactual R) is NEGATIVE, flip
 `EXIT_ADVISOR_DRYRUN` to True.** If it is positive (or zero), the advisor stays live and the next review
 is at **20**, same rule. Report the state after EVERY `ai_exit` close.
+
+**CURRENT STATE (2026-09-21) — 6 RESOLVED of 10, Σ +0.8798R / +$1.43 IN THE ADVISOR'S FAVOUR. THE RULE DOES NOT
+FIRE; `EXIT_ADVISOR_DRYRUN` stays False. Four more resolved closes required.** (Rows 4–5 from the 2026-09-16 15:20 report,
+which never reached this table; row 6 by the 2026-09-21 ruling. Every counterfactual is resolved — nothing is running.)
+
+| # | vpos | side | closed | advisor R (net $) | counterfactual exit | counterfactual R (net $) | Δ R | Δ $ |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 101 | SHORT | 09-01 18:00 | +0.2956 (+0.57) | trail 77 124.0 @ 09-01 19:00 | +0.4509 (+0.87) | −0.1553 | −0.30 |
+| 2 | 104 | LONG | 09-09 08:30 | +0.5757 (+0.79) | sl 78 350.1 @ 09-09 15:11 | −1.1033 (−1.51) | +1.6791 | +2.30 |
+| 3 | 105 | SHORT | 09-09 23:46 | −0.0136 (−0.03) | trail 77 393.9 @ 09-10 14:56 | +0.7669 (+1.50) | −0.7805 | −1.53 |
+| 4 | 106 | SHORT | 09-12 09:15 | −0.2963 (−0.72) | sl 78 301.6 @ 09-14 09:53 | −1.0603 (−2.59) | +0.7640 | +1.87 |
+| 5 | 108 | LONG | 09-14 17:00 | +1.1371 (+1.54) | trail 79 024.4 @ 09-14 21:01 | +1.5947 (+2.15) | −0.4576 | −0.62 |
+| 6 | **109** | LONG | 09-18 23:45 | **+2.0051 (+3.43)** — `close_reason='external'`, advisor `close=True` 0.72, trigger `armed_exit`, trail ARMED | **trail 81 018.9 @ 09-19 04:33** (water mark 81 718.4, trail 0.856 %) | **+2.1750 (+3.72)** | **−0.1699** | **−0.29** |
+| | | | | | | **Σ RESOLVED (6 of 10)** | **+0.8798** | **+$1.43** |
+
+Row 6 replayed by the canon method on 3 974 BingX 1m candles (2026-09-18 23:00 → 09-21 17:13), **0 gaps**, bardir order,
+the row's own values (fill 78 978.4, original stop 78 077.0, size 0.0019, risk 1.7126, trail 0.856 %, water mark 81 314.6
+at the close, armed); **the same stand reproduced the published vpos 108 counterfactual to the digit (+1.5947R)** first.
+
+*(superseded 2026-09-21 by the table above — the 2026-09-12 state, kept for its per-row resolution detail)*
 
 **CURRENT STATE — 4 observed, 3 RESOLVED of 10; Σ over the resolved three +0.7433R / +$0.47 IN THE ADVISOR'S FAVOUR; vpos 106 PENDING (2026-09-12 14:23 UTC):**
 
