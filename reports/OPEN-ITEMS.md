@@ -10,9 +10,28 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `7798f51`, re-verified at 2026-09-21 18:10 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `d070a5f`, re-verified at 2026-09-21 18:25 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`d070a5f` — ✅ A FAILED POSITION READ NEVER REPORTS SAFETY IN THE TWO EMERGENCY PATHS. APPLIED FROM FLAT
+AND LOADED by the 2026-09-21 18:16:14 UTC restart** (MainPID 3989951 → 3997369, worker 3997377; boot line
+`[TITAN][RECONCILE-XDB] ✅ exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`; 0 boot errors).
+Two functions only (AST: 76/76 and 47/47 top-level nodes, nothing else differs): `virtual_trader._entry_failsafe_close`
+(`4184eb8ff1f59095` → `3f6f0dc0396b7107`) and `breakeven_worker._emergency_close` (`f76bede58d51b55b` → `7bd67a06baadd054`).
+`main._execute_close_position` returns None for a flat book AND for a failed read; the entry failsafe turned that into
+"nothing is exposed" (breaker NOT tripped) and the BE emergency close sent "✅ Emergency close executed" whatever happened.
+Now: entry failsafe on None re-reads three-state — FLAT → today's "nothing open" alert byte-identical; OPEN → a failed
+attempt, retried; UNKNOWN → retried, and if the attempts run out on a failed read `_UNSAFE_STATE` is TRIPPED with
+"POSITION READ FAILED, EXPOSURE UNKNOWN". Emergency close verifies AFTER every close: FLAT → the same ✅; OPEN → "DID NOT
+FLATTEN"; UNKNOWN → "OUTCOME UNKNOWN" — both hands-required. Contract `tests/test_failed_read_never_reports_safety.py`:
+**RED 5 of 15 failing on the unpatched files (exactly E2 E3 M2 M4 M6 — the safety claims), GREEN 15 of 15, root AND
+botuser**, live `trades.db` opened **0** times (kernel `openat` trace). `7798f51`'s contract still 19/19 (its AST pin
+widened to this function). Every state-table value and all four advisor SYSTEM prompts byte-identical in the LOADED
+bytecode. Same pass: rows 34281/34282 relabelled `failed` (see `§0.VENUE-VS-DB`); the `titan.service` "changed on disk"
+warning traced to a GLOBAL flag (a login-session scope in `/run/systemd/transient`), the unit itself unchanged — no
+daemon-reload. `openitems_guard` EXIT=0 before and after.
+Record: `reports/2026-09-21-1830-titan-emergency-paths-no-longer-report-safety-on-failed-read.md`
 
 **`7798f51` — ✅ A FAILED POSITION READ IS NOT A FLAT BOOK. APPLIED FROM FLAT AND LOADED by the
 2026-09-21 17:39:09 UTC restart** (MainPID 1572470 → 3989951, worker 3989975; boot line `[TITAN][RECONCILE-XDB] ✅
@@ -144,7 +163,7 @@ recorded here, where the DB book and the BingX book can be reconciled:
 | close | order `2101906906608267264`, reduce-only MARKET SELL @ **81 552.1**, 05:30:33 UTC, fee −0.073397 |
 | realised / commission / **net** | −0.0463 (income −0.04626) / −0.14682 / **−$0.1931** (−0.120R on a 891.8-pt 1R) |
 | cause | `sqlite3.OperationalError: database is locked` at `virtual_trader.py:987`, AFTER the fill → `[ENTRY-FAILSAFE]` closed at market in 7 s |
-| signal rows | 34280 `Within Bullish OB` status `failed`; **34281 `Bullish OB Created` and 34282 `Bullish I-CHOCH+` stuck `pending`** (their status writes were lost to the same lock); which of the three owned the fill is NOT provable |
+| signal rows | 34280 `Within Bullish OB` status `failed`; **34281 `Bullish OB Created` and 34282 `Bullish I-CHOCH+` stuck `pending`** (their status writes were lost to the same lock) — 🟢 **relabelled `failed` 2026-09-21 18:15 UTC** (`error='database is locked (status write lost)'`, 2 rows; advisor fields stay NULL); which of the three owned the fill is NOT provable |
 
 **Reconciliation rule:** venue net P&L = Σ `virtual_positions.net_pnl` + Σ rows of THIS table. Rows: 1. Σ −$0.1931.
 
@@ -170,8 +189,12 @@ fail when a long reader and any writer overlap.
   NOT rewritten:** `UPDATE trades SET status='failed' … WHERE id IN (34281,34282) AND status='pending'` is safe (no code reads
   `trades.status='pending'`; skip_attribution already holds both as `failed`; only `silence_digest`'s status count moves)
   but it restores a label, not the lost advisor fields — operator's call. A third, older one exists: row 15604 (2026-07-13).
+  🟢 **DONE 2026-09-21 18:15 UTC on the operator's approval** — exactly that UPDATE, **2 rows affected**, `.bak`
+  `trades.db.bak_relabel_20260921T181534Z` (online backup API, integrity ok); row 15604 NOT touched; nothing reconstructed.
 
-## 🔴 §0.FAILED-READ-CALLERS — THE SHIM'S OTHER CONSUMERS. NOT MIGRATED (separate pass). Written 2026-09-21.
+## 🔴 §0.FAILED-READ-CALLERS — THE SHIM'S OTHER CONSUMERS. Written 2026-09-21; the two SAFETY-direction callers MIGRATED in `d070a5f`.
+
+🟢 **Migrated (`d070a5f`, 2026-09-21 18:16):** the entry failsafe and the BE emergency close — the only two that reported SAFETY on a failed read. 🟡 **Next pass — still pending:** `main.py:3663` `_handle_5m_close_via_ai` and `main.py:4068` `_handle_liquidity_sweep` — they TAKE actions (skip a consultation / a sweep close, send a false "No open LONG") but declare no safety.
 
 `main._fetch_open_position` and `breakeven_worker._fetch_open_position` both return None for "flat" AND "read failed".
 `_reconcile_passive_fill` was migrated in `7798f51`. The rest, with what the None branch DOES:
@@ -179,8 +202,8 @@ fail when a long reader and any writer overlap.
 | caller | None branch | risk |
 |---|---|---|
 | `main.py:1357` `_execute_close_position` | returns None → the close is ABORTED, no order sent | 🔴 feeds the two emergency rows below |
-| ↳ `virtual_trader.py:207` entry failsafe | None read as "**nothing is exposed**" → alert + return, `_UNSAFE_STATE` NOT tripped | 🔴🔴 a failed read declares a possibly naked position safe |
-| ↳ `breakeven_worker.py:475` emergency close | sends "✅ **Emergency close executed**" whatever the result | 🔴🔴 same — false success after stop cancelled + recreate failed |
+| ↳ `virtual_trader.py:207` entry failsafe | ~~None read as "nothing is exposed"~~ → 🟢 **`d070a5f`:** re-read; FLAT → as before, OPEN → retry, UNKNOWN → retry then breaker TRIPPED + "READ FAILED, EXPOSURE UNKNOWN" | 🟢 migrated |
+| ↳ `breakeven_worker.py:475` emergency close | ~~"✅ Emergency close executed" whatever the result~~ → 🟢 **`d070a5f`:** verified after the close; ✅ only on FLAT, "DID NOT FLATTEN" on OPEN, "OUTCOME UNKNOWN" on UNKNOWN | 🟢 migrated |
 | ↳ `virtual_trader._do_close` (via market_close) | "VIRTUAL CLOSE ABORTED … row left OPEN", retried next tick | 🟡 a wanted close deferred ≥ 10 s; exchange stop still in place |
 | `main.py:3663` `_handle_5m_close_via_ai` | side treated as not open → exit consultation skipped | 🟡 a missed advisor decision |
 | `main.py:3900` `_handle_exit_signal` | only when `engine_owns_position()` is False — **dead in live** (`ROUTING_MIGRATED_TO_ADAPTER=True`) | ⚪ |
