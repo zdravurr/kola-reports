@@ -10,7 +10,7 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `d070a5f`, re-verified at 2026-09-21 18:25 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `d070a5f`, re-verified at 2026-09-21 18:17 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
 *(previous header values `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
 
