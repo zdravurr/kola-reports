@@ -10,9 +10,24 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `40aad46`, re-verified at 2026-09-21 18:32 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `07f9025`, re-verified at 2026-09-21 18:51 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `d070a5f`, `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `40aad46`, `d070a5f`, `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`07f9025` — ✅ AN ARMED EXIT (AND A 5m ADVISOR CLOSE) IS NEVER DROPPED ON A FAILED READ. APPLIED FROM FLAT AND
+LOADED by the 2026-09-21 18:49:23 UTC restart** (MainPID 4001002 → 4004539, worker 4004551; boot line
+`[TITAN][RECONCILE-XDB] ✅ exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`; 0 boot
+errors). `main.py` only, two functions (AST 160/160): `_execute_armed_exit` used to clear `exit_pending` FIRST and then
+say "Armed exit fired but no live position" — on a failed read the exit was DROPPED and nothing re-armed it;
+`_handle_5m_close_via_ai` wrote `no_position` + "Position vanished before close" and dropped the advisor's close. Now,
+on None from `_execute_close_position`: three-state read — FLAT → today's behaviour byte-identical; OPEN → the close
+is retried once; UNKNOWN or still not closed → nothing cleared, status `close_unconfirmed`, "close NOT confirmed".
+`exit_pending` is cleared only once the close outcome is known. Caller-local, not the primitive: an exception-style
+primitive would bypass the BE-emergency-close breaker of `40aad46`, and the primitive has 8 callers. Contract
+`test_close_not_dropped_on_failed_read`: RED on `40aad46` (A1 A3 A4 B1 B3 O), GREEN 12/12; the three earlier contracts
+stay GREEN (13/15/19) — root AND botuser, live `trades.db` opened 0 times. Same pass: **vpos 109 taken OUT of
+`§0.EXIT-ADVISOR-RULE` (operator's second ruling) — ledger 5 of 10, Σ +1.0497R.** `openitems_guard` EXIT=0 before and after.
+Record: `reports/2026-09-21-1900-titan-vpos-109-out-armed-exit-never-dropped-on-failed-read.md`
 
 **`40aad46` — ✅ THE FAILED-READ WORK IS FINISHED FOR EVERY CALLER THAT ACTS, BAR ONE; ARMED EXITS ARE LABELLED
 `armed_exit`. APPLIED FROM FLAT AND LOADED by the 2026-09-21 18:31:13 UTC restart** (MainPID 3997369 → 4001002, worker
@@ -211,6 +226,21 @@ fail when a long reader and any writer overlap.
 
 ## 🔴 §0.FAILED-READ-CALLERS — THE SHIM'S OTHER CONSUMERS. Written 2026-09-21; safety-direction callers MIGRATED in `d070a5f`, the last two acting callers in `40aad46`.
 
+🔴 **2026-09-21 18:49 (`07f9025`) — IS THERE ANY REMAINING LIVE CALLER WHOSE None BRANCH DROPS AN ACTION OR CLAIMS A
+FACT? YES, TWO. The answer is NOT none.** Fixed in `07f9025`: the armed exit (`exit_pending` now cleared only once the
+close outcome is known) and the 5m advisor close. **Remaining, both in `virtual_trader`, both reached through
+`_do_close → order_adapter.market_close → _execute_close_position(_from_adapter=True)`:**
+(1) **`_advisor_close`** — the hourly / 15m advisor exits, i.e. the `ai_exit` population itself. None → journal
+"no live position to close — left for passive-fill reconciliation, NOT retried": on a failed read the advisor's close is
+DROPPED until its next verdict (≤ 1 h) and the journal line states a false fact. No Telegram; the row stays OPEN; the
+exchange stop stays in place.
+(2) **`_run_recheck_tier`** post-entry critical close — `recheck_status='closed_critical'` is written and "🛑 Post-entry
+T+Ns — EMERGENCY CLOSE" is sent BEFORE `_do_close`; on a failed read the close aborts and the tier never re-fires: a
+critical close DROPPED under a message that says it happened.
+Deferrals only (no drop, no claim): the poller's sl / trail / breakeven closes (the trigger persists; retried next tick).
+Dead in live: trend-reversal close (`TREND_REVERSAL_EXIT_DRYRUN = True`), Smart-TP sweep close
+(`EQH_EQL_SMART_TP_ENABLED = False`), the legacy SL-failsafe in `main._execute_entry` (returns into the engine first).
+
 🟢 **2026-09-21 18:31 (`40aad46`): every DIRECT live consumer of the shim whose None branch acts is migrated.** 🟡 **ONE remains, and it is the shared primitive: `main.py:1357` `_execute_close_position`.** On a failed read it aborts the close and returns None. `virtual_trader._do_close` then keeps the row OPEN and the poller retries next tick with the exchange stop still in place — no safety is claimed. But one caller surfaces that None as a statement: **the armed exit sends "Armed exit fired but no live position" and has already cleared `exit_pending`**, so on a failed read the armed exit is dropped with a false message. Migrating the primitive changes 8 callers — its own pass. Dead in live: `main.py:3926` / `4340` (`engine_owns_position()` is True). Dormant: `breakeven_worker.py:734`, `788`, `807` (`breakeven_jobs` has 0 rows ever). Benign: `breakeven_worker.py:425` (old stop held, retried). `main.py:3669` is `40aad46`'s own call, reached only after the double probe says OPEN.
 
 🟢 **Migrated (`d070a5f`, 2026-09-21 18:16):** the entry failsafe and the BE emergency close — the only two that reported SAFETY on a failed read. 🟡 **Next pass — still pending:** `main.py:3663` `_handle_5m_close_via_ai` and `main.py:4068` `_handle_liquidity_sweep` — they TAKE actions (skip a consultation / a sweep close, send a false "No open LONG") but declare no safety.
@@ -267,6 +297,21 @@ advisor merely AGREED (`close=True` 0.72) — had it said hold, the position wou
 operator re-decides.** Without row 6 the ledger is **5 of 10, Σ +1.0497R / +$1.72** (still positive; the rule does not
 fire either way). This is also why the new label is `armed_exit`, not an advisor label.
 
+🔴🔴 **POPULATION RESTATED 2026-09-21 18:51 — OPERATOR'S SECOND RULING: vpos 109 is OUT.** The population is **every
+LIVE close from vpos 101 onward where the ADVISOR'S VERDICT DETERMINED THE CLOSE — i.e. `close_reason = 'ai_exit'`**
+(written only by `virtual_trader._advisor_close` and the 5m advisor-close path, both of which close ON the verdict).
+**An advisor consultation whose verdict is discarded does not qualify** — the armed exit consults and discards
+(`consult_exit_advisor(... 'armed_exit')`, return value unused). **The live proof: vpos 99 — the advisor said `hold`
+0.62 at 2026-08-30 08:45:08 and the armed exit closed it at 08:45:16 anyway** (trades 28402 → 28403 `15m_armed_exit`
+`executed`). vpos 109 has the same pair (33670 `close` 0.72 → 33671 `15m_armed_exit` `executed`).
+🔴 **Both rulings stand in the record, so the reversal is visible.** The FIRST ruling (IN) was justified as adding a
+negative row — "the conservative direction". **The SECOND ruling (OUT) moves the sum +0.1699R IN THE ADVISOR'S FAVOUR —
+the OPPOSITE direction.** The reason is factual population membership (vpos 109 was not an advisor decision), not
+selection; had the Δ been positive, the row would leave just the same.
+**vpos 95 under the same definition:** also an armed exit (26626 `close` 0.72 → 26628 `15m_armed_exit` `executed`,
+`close_reason='external'`) — NOT an advisor decision, so it belongs to NEITHER population; it was never in the OLD one
+(the OLD population is `ai_exit` closes before vpos 101, and vpos 95's reason is `external`). Status: excluded, unchanged.
+
 **THE MEASURE.** For each such close: the advisor's realised R (`net_pnl / initial_risk_usdt`, as
 everywhere in this canon) **minus the counterfactual R of having HELD the position to the trail-or-stop
 exit**, replayed on BingX `BTC/USDT:USDT` 1m candles in `bardir` order (rising bar → low first, falling bar
@@ -281,9 +326,9 @@ counts for nothing until it does.
 `EXIT_ADVISOR_DRYRUN` to True.** If it is positive (or zero), the advisor stays live and the next review
 is at **20**, same rule. Report the state after EVERY `ai_exit` close.
 
-**CURRENT STATE (2026-09-21) — 6 RESOLVED of 10, Σ +0.8798R / +$1.43 IN THE ADVISOR'S FAVOUR. THE RULE DOES NOT
-FIRE; `EXIT_ADVISOR_DRYRUN` stays False. Four more resolved closes required.** (Rows 4–5 from the 2026-09-16 15:20 report,
-which never reached this table; row 6 by the 2026-09-21 ruling. Every counterfactual is resolved — nothing is running.)
+**CURRENT STATE (2026-09-21, second ruling) — 5 RESOLVED of 10, Σ +1.0497R / +$1.72 IN THE ADVISOR'S FAVOUR. THE RULE DOES NOT
+FIRE; `EXIT_ADVISOR_DRYRUN` stays False. Five more resolved closes required.** (Rows 4–5 from the 2026-09-16 15:20 report,
+which never reached this table. Every counterfactual is resolved — nothing is running.)
 
 | # | vpos | side | closed | advisor R (net $) | counterfactual exit | counterfactual R (net $) | Δ R | Δ $ |
 |---|---|---|---|---|---|---|---|---|
@@ -292,8 +337,10 @@ which never reached this table; row 6 by the 2026-09-21 ruling. Every counterfac
 | 3 | 105 | SHORT | 09-09 23:46 | −0.0136 (−0.03) | trail 77 393.9 @ 09-10 14:56 | +0.7669 (+1.50) | −0.7805 | −1.53 |
 | 4 | 106 | SHORT | 09-12 09:15 | −0.2963 (−0.72) | sl 78 301.6 @ 09-14 09:53 | −1.0603 (−2.59) | +0.7640 | +1.87 |
 | 5 | 108 | LONG | 09-14 17:00 | +1.1371 (+1.54) | trail 79 024.4 @ 09-14 21:01 | +1.5947 (+2.15) | −0.4576 | −0.62 |
-| 6 | **109** | LONG | 09-18 23:45 | **+2.0051 (+3.43)** — `close_reason='external'`, advisor `close=True` 0.72, trigger `armed_exit`, trail ARMED | **trail 81 018.9 @ 09-19 04:33** (water mark 81 718.4, trail 0.856 %) | **+2.1750 (+3.72)** | **−0.1699** | **−0.29** |
-| | | | | | | **Σ RESOLVED (6 of 10)** | **+0.8798** | **+$1.43** |
+| | | | | | | **Σ RESOLVED (5 of 10)** | **+1.0497** | **+$1.72** |
+
+~~¦ 6 ¦ **109** ¦ LONG ¦ 09-18 23:45 ¦ **+2.0051 (+3.43)** — `close_reason='external'`, advisor `close=True` 0.72, trigger `armed_exit`, trail ARMED ¦ **trail 81 018.9 @ 09-19 04:33** (water mark 81 718.4, trail 0.856 %) ¦ **+2.1750 (+3.72)** ¦ **−0.1699** ¦ **−0.29** ¦~~
+**Struck out 2026-09-21 18:51 (second ruling): vpos 109 was a MECHANICAL armed exit — the advisor's `close=True` was consulted and discarded, not the reason for the close (see POPULATION RESTATED). Kept visible: it was IN from the first ruling (canon `053f5ff`) until this one; with it the sum was +0.8798R.**
 
 Row 6 replayed by the canon method on 3 974 BingX 1m candles (2026-09-18 23:00 → 09-21 17:13), **0 gaps**, bardir order,
 the row's own values (fill 78 978.4, original stop 78 077.0, size 0.0019, risk 1.7126, trail 0.856 %, water mark 81 314.6
