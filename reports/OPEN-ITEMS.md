@@ -10,9 +10,22 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `991b333`, re-verified at 2026-09-26 17:00 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `386d5eb`, re-verified at 2026-09-26 18:40 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `f53d048`, `07f9025`, `40aad46`, `d070a5f`, `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `991b333`, `f53d048`, `07f9025`, `40aad46`, `d070a5f`, `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`386d5eb` — ✅ THE EXIT ADVISOR'S `Agreement at entry:` STATES WHAT THE GATE COUNTED AT ENTRY (the exit twin of `991b333`,
+operator's word 2026-09-26). APPLIED FROM FLAT, restart 2026-09-26 18:38:01 UTC** (MainPID 912030 → 927117, worker 927166;
+boot line `[TITAN][RECONCILE-XDB] ✅ exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`; 0
+tracebacks). `signal_tiers.entry_thesis_lines` only (AST 17 → 17, one node): reuses `_gate_agreement()` on the stored entry
+facts; `entry_tiers_json` and `facts['agreement']` unchanged; the line appears exactly when it did; no gate data → today's
+sentence byte-identical. Census of the 185 stored exit consultations carrying the line: 128 render the gate count, 57 fall
+back (HIDE_1H era); **90 of 128 claimed agreement the gate had not counted — every consultation on ledger rows 101, 104, 105,
+106, 108** (not re-scored). Contract `test_exit_agreement_line_states_gate_count`: RED on `991b333` (8), GREEN 30/30; all 9
+contracts GREEN root AND botuser, `trades.db` opened 0 times (strace). Loaded bytecode: every state-table value and the four
+SYSTEM prompts unchanged. 🟡 **In-process: OPEN until the first EXIT consultation** (lazy import; an exit consultation needs an
+open position — see `§0.AGREEMENT-LINE`). `openitems_guard` EXIT=0 before and after.
+Record: `reports/2026-09-26-1840-titan-exit-agreement-at-entry-states-the-gate-count-applied.md`
 
 **`991b333` — ✅ THE ENTRY PROMPT'S `Agreement:` LINE STATES WHAT THE GATE COUNTED. APPLIED FROM FLAT AND LOADED-ON-FIRST-USE
 by the 2026-09-26 16:57:26 UTC restart** (MainPID 4007821 → 912030, worker 912101; boot line
@@ -214,7 +227,17 @@ facts only — no new guidance, no threshold. `_CLOSE_SYSTEM_RICH` byte-identica
 15m/5m (82/84 populated, NULL prints `not recorded`); 1d/4h/1h are marked ENTRY-ONLY because
 the sample table has no such column at all (313/313). `_CLOSE_SYSTEM_RICH` byte-identical.**
 
-## 🟢 §0.AGREEMENT-LINE — the entry prompt's `Agreement:` line states the GATE's count. `991b333`, restart 2026-09-26 16:57:26 UTC.
+## 🟢 §0.AGREEMENT-LINE — the entry prompt's `Agreement:` line states the GATE's count. `991b333`, restart 2026-09-26 16:57:26 UTC. **EXIT TWIN FIXED: `386d5eb`, restart 2026-09-26 18:38:01 UTC.**
+
+🔴 **EXIT-SIDE COHORT BOUNDARY — 2026-09-26 18:38:01 UTC.** Exit consultations before it read `Agreement at entry:` as the
+SLOT sentence; after it, the gate's count at entry (same `_gate_agreement()`). Before the fix: 90 of the 128 gate-renderable
+stored exit consultations (70.3 %) claimed agreement the gate had not counted, incl. every consultation on ledger rows 101,
+104, 105, 106, 108. vpos 112's closing consultation (trades 34772, 08:00:26) read "15m and 1H and 5m all point LONG … agree";
+patched it reads "Counted by the gate: 1 of 3 tiers (1H LONG) … 15m and 5m … were not counted" — one line of the prompt.
+🟡 **OPEN — exit in-process confirmation.** At the restart `signal_tiers.cpython-312.pyc` held the `991b333` compile (header ≠
+source). Close with: the first `trades` row with `signal_type='exit_ai_dryrun'` (or any exit consultation) after 18:38:01
+UTC whose `ai_user_prompt` carries `Agreement at entry: Counted by the gate:` — this needs an OPEN position. The first
+ENTRY consultation after 18:38:01 proves only that the module recompiled, not the exit render.
 
 🔴 **COHORT BOUNDARY — 2026-09-26 16:57:26 UTC.** Entry consultations before it read the slot sentence ("all point
 LONG … agree"); after it, the gate count. Measured before the change (all 3,108 stored entry consultations): the
@@ -395,6 +418,20 @@ counts for nothing until it does.
 🔴 **THE STOPPING RULE. At 10 such closes: if Σ(advisor R − counterfactual R) is NEGATIVE, flip
 `EXIT_ADVISOR_DRYRUN` to True.** If it is positive (or zero), the advisor stays live and the next review
 is at **20**, same rule. Report the state after EVERY `ai_exit` close.
+
+🔴 **TWO WORDING BOUNDARIES — stated 2026-09-26, operator's decision: fix, record the boundary, KEEP COUNTING.** The ledger
+now spans **(1) 2026-09-12 14:58:32 UTC** (`f16c271`, the unarmed-trail fact leads with the option) and **(2) 2026-09-26
+18:38:01 UTC** (`386d5eb`, `Agreement at entry:` states the gate's count). **The rule is unchanged: it decides at 10 RESOLVED
+`ai_exit` closes, same measure, same sign test.** Nothing is re-scored. Where the five resolved rows fall:
+| row | vpos | closed (UTC) | vs boundary (1) 09-12 14:58:32 | vs boundary (2) 09-26 18:38:01 |
+|---|---|---|---|---|
+| 1 | 101 | 09-01 18:00 | before | before |
+| 2 | 104 | 09-09 08:30 | before | before |
+| 3 | 105 | 09-09 23:46 | before | before |
+| 4 | 106 | 09-12 09:15 | before | before |
+| 5 | 108 | 09-14 17:00 | **after** | before |
+Rows 6–10 will all fall after both. All five resolved rows were decided under the slot `Agreement at entry:` sentence, and
+every one of their consultations carried an agreement claim the gate had not counted.
 
 **CURRENT STATE (2026-09-21, second ruling) — 5 RESOLVED of 10, Σ +1.0497R / +$1.72 IN THE ADVISOR'S FAVOUR. THE RULE DOES NOT
 FIRE; `EXIT_ADVISOR_DRYRUN` stays False. Five more resolved closes required.** (Rows 4–5 from the 2026-09-16 15:20 report,
