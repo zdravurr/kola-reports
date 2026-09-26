@@ -10,9 +10,29 @@
 (not copied forward): both `True`. Score bars read from the same
 import: `CONFLUENCE_SCORE_THRESHOLD = 3.0`, `CONFLUENCE_FLAT_THRESHOLD = 5.0`.
 
-🔴 **HEAD `f53d048`, re-verified at 2026-09-21 19:05 UTC by `git log -1 --format=%h -- titan-bot/`,
+🔴 **HEAD `991b333`, re-verified at 2026-09-26 17:00 UTC by `git log -1 --format=%h -- titan-bot/`,
 the last commit that TOUCHED TITAN (NOT `git rev-parse HEAD` of the whole `/root` repo).**
-*(previous header values `07f9025`, `40aad46`, `d070a5f`, `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+*(previous header values `f53d048`, `07f9025`, `40aad46`, `d070a5f`, `7798f51`, `f16c271`, `7b17e11`, `cd0f175`, `16b851d`, `6fa5d45`, `3b075fd`, `652bb10`, `f5d3542`, `9c40a4f`, `c66a900`, `ed95160`, `7ba8241`, `3888504`, `a0c77f2`, `2bea657`, `295af4e`, kept for audit.)*
+
+**`991b333` — ✅ THE ENTRY PROMPT'S `Agreement:` LINE STATES WHAT THE GATE COUNTED. APPLIED FROM FLAT AND LOADED-ON-FIRST-USE
+by the 2026-09-26 16:57:26 UTC restart** (MainPID 4007821 → 912030, worker 912101; boot line
+`[TITAN][RECONCILE-XDB] ✅ exchange and DB agree for BTC/USDT:USDT: 0 exchange position(s), 0 open row(s)`; 0 tracebacks).
+`signal_tiers.py` only (AST 15 → 17: `render` changed, `_join_labels` + `_gate_agreement` added, nothing else). It
+used to print the SLOT directions — vpos 112: *"15m and 1H and 5m all point LONG; vs the proposed LONG: 15m+1H+5m agree"*
+under two tier lines saying "NOT counted by the gate", and the advisor wrote "15m+5m BULL confluence". Now:
+*"Counted by the gate: 1 of 3 tiers (1H LONG); vs the proposed LONG: 1H agrees. 15m and 5m point LONG on their slots
+but net NEUTRAL inside their categories and were not counted."* Facts only. **Render-only**: `facts['agreement']`
+(persisted to `entry_tiers_json`, read by the EXIT advisor's entry-thesis block) is UNCHANGED — the exit prompt is under
+`§0.EXIT-ADVISOR-RULE` and still prints the slot sentence as `Agreement at entry:` (recorded, not changed). No breakdown /
+malformed / `AI_ADVISOR_HIDE_1H` → today's sentence byte-identical. Contract `test_agreement_line_states_gate_count`:
+RED on `f53d048` (8 failing), GREEN 27/27; all 8 contracts GREEN, root AND botuser (sha256-pinned sandbox copies), live
+`trades.db` opened 0 times (strace). Loaded bytecode: SL_ATR_MULT 2.25, TRAIL_MULT_ATR 1.6875, EXIT_ADVISOR_DRYRUN False,
+BOOK_GATE_DRYRUN False, CLAUSE_A True / CLAUSE_B False, LIVE_TRADING_ENABLED True, ORDER_ADAPTER_LIVE True,
+LIVE_FIXED_MARGIN_USDT 30.0, LEVERAGE 5; four SYSTEM prompts sha256-identical. 🟡 **`signal_tiers` is imported LAZILY**
+(claude_advisor.py:567, main.py:2999): the worker loads the new source on its first entry consultation; the
+`.pyc` on disk at restart was stale (header ≠ source), so Python recompiles on that import. **In-process: LIVE-PROVEN 17:00:09 UTC
+(trades 35682)** — see `§0.AGREEMENT-LINE`. `openitems_guard` EXIT=0 before and after (header).
+Record: `reports/2026-09-26-1701-titan-agreement-line-states-the-gate-count-news-flip-dies-ad.md`
 
 **`f53d048` — ✅ THE FAILED-READ CLASS IS CLOSED: the post-entry critical close and the advisor close. APPLIED FROM FLAT
 AND LOADED by the 2026-09-21 19:03:51 UTC restart** (MainPID 4004539 → 4007821, worker 4007905; boot line
@@ -193,6 +213,24 @@ facts only — no new guidance, no threshold. `_CLOSE_SYSTEM_RICH` byte-identica
 **`9c40a4f` — third and last of the same class: the trend rows now OVERLAP. Entry gains
 15m/5m (82/84 populated, NULL prints `not recorded`); 1d/4h/1h are marked ENTRY-ONLY because
 the sample table has no such column at all (313/313). `_CLOSE_SYSTEM_RICH` byte-identical.**
+
+## 🟢 §0.AGREEMENT-LINE — the entry prompt's `Agreement:` line states the GATE's count. `991b333`, restart 2026-09-26 16:57:26 UTC.
+
+🔴 **COHORT BOUNDARY — 2026-09-26 16:57:26 UTC.** Entry consultations before it read the slot sentence ("all point
+LONG … agree"); after it, the gate count. Measured before the change (all 3,108 stored entry consultations): the
+current-form line claimed more agreement than the gate counted on **119 of 341 (34.9 %)**; the older fixed sentence
+("The 3 timeframes are aligned") on **2,453 of 2,767 (88.7 %)**. Current-form misread of tier agreement by the advisor:
+**18 of 51 claim-making reasons (35.3 %)**, all 17 half-reads on `execute` votes. **Never pool verdicts across the boundary.**
+Recorded, not changed: the EXIT advisor's `Agreement at entry:` line still prints the slot sentence (that prompt is
+under `§0.EXIT-ADVISOR-RULE`; moving it is its own cohort boundary and the operator's call).
+🟡 **OPEN — in-process confirmation.** `signal_tiers` is imported lazily; at the restart its `.pyc` was the OLD code
+with a header that does not match the new source, so it is recompiled on first import. Close this with:
+`stat -c '%n %y' /root/titan-bot/__pycache__/signal_tiers.cpython-312.pyc` showing an mtime AFTER 16:57:26 UTC and
+the first post-boundary `trades.ai_user_prompt` carrying `Agreement: Counted by the gate:`.
+🟢 **CLOSED 2026-09-26 17:00 UTC — LIVE-PROVEN.** trades 35682 (17:00:09, `Within Bearish OB`, SHORT, `skip` 0.78) rendered
+`Agreement: Counted by the gate: 2 of 3 tiers (15m SHORT, 5m SHORT); vs the proposed SHORT: 15m+5m agree. 1H points SHORT
+on its slot but the matrix had expired it on its category TTL and it was not counted.`; `.pyc` rewritten 17:00:12, header ==
+source, contains `_gate_agreement`.
 
 ## 🔴 §0.VENUE-VS-DB — A REAL-MONEY ROUND TRIP WITH NO `virtual_positions` ROW. Written 2026-09-21.
 
